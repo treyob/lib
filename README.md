@@ -11,5 +11,5 @@ Otherwise you can do `Set-ExecutionPolicy RemoteSigned` to change the policy on 
 
 
 If you are getting SSL/TLS errors, use this command
-`[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-irm overbytestech.com/repair | iex`
+`[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12`
+`irm overbytestech.com/repair | iex`
