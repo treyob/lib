@@ -1,6 +1,10 @@
 Clear-Host
 # Importing the modules
-
+Write-Host "Setting temporary execution policy"
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process -Force
+Write-Host "Setting TLS settings for script execution"
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+$testing = $false
 $modulearray = @(
     "https://github.com/treyob/lib/releases/download/v0.2/dentalsoftware.psm1",
     "https://github.com/treyob/lib/releases/download/v0.2/ob.psm1"
@@ -16,12 +20,19 @@ Function Import-OBModules {
     if (-not (Test-Path -Path $tempPath)) {
         New-Item -Path $tempPath -ItemType Directory -Force > $null
     }
-    Invoke-WebRequest -Uri $psm1Url -OutFile $psm1FilePath > $null
+    Invoke-WebRequest -Uri $psm1Url -OutFile $psm1FilePath 
     Import-Module -Name $psm1FilePath
     Write-Host "Imported Module $fileName"
 }
-ForEach ($psm1Url in $modulearray) {
-    Import-OBModules $psm1Url
+if (-Not $testing) {
+    ForEach ($psm1Url in $modulearray) {
+        Import-OBModules $psm1Url
+    }
+} else {
+    Write-Warning "Testing: Enabled"
+    pause
+    Import-OBModules "https://github.com/obmmoreno/obwinrepair/releases/download/obwinrepair-v0.3/ob.psm1"
+    Import-OBModules "https://github.com/obmmoreno/obwinrepair/releases/download/obwinrepair-v0.3/dentalsoftware.psm1"
 }
 
 do {
@@ -45,21 +56,42 @@ ________                   __________          __                     .____    .
 4. Get Device Serial Number                           > ^ <               22. .Net Repair Tool
 5. Run GPUpdate                                                           23. HWiNFO
 6. Flush and Register DNS                                                 24. TeamViewerQS
-7. Create Local User and Add to Administrators          |\     _,,,---,,_   
+7. Create Local User and Add to Administrators          |\     _,,,---,,_ 25. Revo Uninstaller
 8. Enable PSRemoting                             ZZZzz /,```.-'```'    -.  ;-;;,_
-9. Disable IPv6                                       |,4-  ) )-,_. ,\ (  `'-'
-10. Enable Remote Desktop                            '---''(_/--'  ```-' \_) 
-11. Set Firewall Profiles to Allow All
+9. Disable IPv6                                       |,4-  ) )-,_. ,\ (  `'-`'
+10. Enable Remote Desktop                            `'---`'`'(_/--`'  ```-`' \_) 
+11. Set Firewall Profiles to Allow All                                    26. Office Install
 12. CheckDisk C:\
-13. Download and Install Microsoft Visual C++ 2015-2022
-14. Dental Software Section
-15. Server Power and Bitlocker Options
-16. Set Adobe Security Settings
-17. Get Domain Computers Info from DC
-18. Support Numbers
-00. Exit 
+13. Download and Install Microsoft Visual C++ 2015-2022 
 "@ -ForegroundColor DarkCyan
+# Line 1
+Write-Host "14. Dental Software Section                 " -ForegroundColor DarkCyan -NoNewLine
+Write-Host '     ___' -ForegroundColor Cyan
+
+# Line 2
+Write-Host "15. Server Power and Bitlocker Options      " -ForegroundColor DarkCyan -NoNewLine 
+Write-Host ' _.-|   |          |\__/,|   (`\' -ForegroundColor Cyan
+
+# Line 3
+Write-Host "16. Set Adobe Security Settings             " -ForegroundColor DarkCyan -NoNewLine
+Write-Host '{   |   |          |o o  |__ _) )' -ForegroundColor Cyan
+
+# Line 4
+Write-Host "17. Get Domain Computers Info from DC       " -ForegroundColor DarkCyan -NoNewLine
+Write-Host ' "-.|___|        _.( T   )  `  /' -ForegroundColor Cyan
+
+# Line 5
+Write-Host "18. Support Numbers                         " -ForegroundColor DarkCyan -NoNewLine
+Write-Host "   .--'-`-.     _((_ `^--' /_<  \\" -ForegroundColor Cyan
+
+# Line 6
+Write-Host "00. Exit                                    " -ForegroundColor DarkCyan -NoNewLine
+Write-Host '.+|______|__.-||__)`-''(((/  (((/' -ForegroundColor Cyan
+
     $choice = Read-Host "Enter the number of your choice"
+
+# Release and Renew the IP Address
+
 
 # Main Menu Switch
 switch ($choice) {
@@ -111,14 +143,13 @@ Ray Medical - 800-976-4586
 "@ -ForegroundColor DarkCyan
         Read-Host "Press Enter to go back"}
     "19" { Invoke-NetScan }
-    "20" { Start-Job -ScriptBlock { Import-Module "$env:TEMP\obsoftware\ob.psm1"; Get-IPScanner; Exit } > $null
-        Read-Host "IPScanner is downloading in the background and will start in a moment"
-        }
+    "20" { Start-Process powershell.exe -ArgumentList "-NoProfile -WindowStyle Hidden -Command & {Import-Module '$env:TEMP\obsoftware\ob.psm1'; Get-IPScanner; pause}" -Verb RunAs
+        Read-Host "Advanced IP Scanner is downloading in the background and will start in a moment. " }
     "21" { Start-Job -ScriptBlock { Import-Module "$env:TEMP\obsoftware\ob.psm1"; Invoke-WizTree; Exit } > $null
         Read-Host "WizTree is downloading in the background and will start in a moment"
         }
     "22" { Start-Job -ScriptBlock { Import-Module "$env:TEMP\obsoftware\ob.psm1"; Invoke-DotNetRepair; Exit } > $null
-    Read-Host "HWiNFO is downloading in the background and will start in a moment"
+        Read-Host "HWiNFO is downloading in the background and will start in a moment"
         }
     "23" { Start-Job -ScriptBlock { Import-Module "$env:TEMP\obsoftware\ob.psm1"; Invoke-HWInfo; Exit } > $null
         Read-Host "HWiNFO is downloading in the background and will start in a moment"
@@ -126,6 +157,9 @@ Ray Medical - 800-976-4586
     "24" { Start-Job -ScriptBlock { Import-Module "$env:TEMP\obsoftware\ob.psm1"; Invoke-TeamViewerQS; Exit } > $null 
         Read-Host "TeamViewerQS is downloading in the background and will start in a moment"
         }
-    "00" { Remove-Item -Recurse -Force "$env:TEMP\obsoftware"; $choice = "000"}
+    "25" { Start-Job -ScriptBlock { Import-Module "$env:TEMP\obsoftware\ob.psm1"; Invoke-RevoUninstaller; Exit } > $null 
+        Read-Host "Revo Uninstaller is downloading in the background and will start in a moment" }
+    "26" { Start-Process powershell.exe -ArgumentList "-NoExit", "-Command", "Import-Module '$env:TEMP\obsoftware\ob.psm1'; Invoke-OfficeInstall; Exit" }
+    "00" { Remove-Item -Recurse -Force "$env:TEMP\obsoftware"; Write-Host "Cleaned up module files"; $choice = "000"}
     }
 } while ($choice -ne "000")
