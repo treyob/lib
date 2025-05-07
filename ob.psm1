@@ -1,3 +1,231 @@
+function Install-Office {
+    param (
+        [string]$version,
+        [int]$arch
+    )
+    $xmlPath = "C:\officeodt\officeodt-$version-x$arch.xml"
+    $officeODTlink = "https://download.microsoft.com/download/6c1eeb25-cf8b-41d9-8d0d-cc1dbc032140/officedeploymenttool_18623-20156.exe"
+    if (-Not (Test-Path -PathType Container "C:\officeodt")) {
+        mkdir c:\officeodt > $null
+        Write-Host "Created the C:\officeodt directory"
+    }
+    # Define your variables
+    switch ($version) {
+        "365B" { $version = "O365ProPlusRetail" }
+        "2016" { $version = "ProPlus2016Retail"}
+    }
+    if ((Read-Host "Would you like to exclude OneDrive? (Y/n)") -notin @("n","N","no")) {
+        $excludeOneDrive = '<ExcludeApp ID="OneDrive" />'
+    }
+
+    # Create the XML content with variable substitution
+    $xmlContent = @"
+<Configuration>
+  <Add SourcePath="C:\officeodt\" OfficeClientEdition="$arch" Channel="Current">
+    <Product ID="$version">
+      <Language ID="en-us" />
+      $excludeOneDrive
+    </Product>
+  </Add>
+  <Display Level="Full" AcceptEULA="TRUE" />
+  <Property Name="FORCEAPPSHUTDOWN" Value="TRUE" />
+  <Property Name="DisplayLevel" Value="Full" />
+
+</Configuration>
+"@
+    Write-Host "XML file Contents are as follows:`n$xmlContent"
+    # Output the XML to a file
+    $xmlContent | Out-File -FilePath $xmlPath -Encoding UTF8
+    
+    Start-BitsTransfer -Source $officeODTlink -Destination "C:\officeodt\officeodt.exe"
+    Write-Host "Please accept the Microsoft License Terms and choose location " -NoNewline
+    Write-Host "C:\officeodt" -ForegroundColor Yellow
+    & C:\officeodt\officeodt.exe
+    # Waiting for officeodt to finish
+    do {
+        $process = Get-Process -Name "officeodt" -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 1
+    } while ($process)
+    Start-Sleep -Seconds 1
+
+    if (Test-Path -PathType Leaf -Path C:\officeodt\setup.exe) {
+        Clear-Host
+        Write-Host "Found office setup.exe! Continuing..."
+    } else {
+        Write-Error "Did not find the setup file in the c:\officeodt folder. Please try again."
+        Write-Host "Cleaning up..."
+        Remove-Item -Recurse C:\officeodt
+        while (Test-Path C:\officeodt) {
+            Write-Host "C:\officeodt could not the removed. Trying again in 3 seconds"...
+            Remove-Item -Recurse C:\officeodt
+        }
+        return "Mission failed, we'll get them next time"
+    }
+    Write-Host "Configuring setup files..."
+    & C:\officeodt\setup.exe /download $xmlPath
+    Write-Host "Installing..."
+    & C:\officeodt\setup.exe /configure $xmlPath
+    Write-Host "Setup has finished running."
+    Write-Host "Cleaning up..."
+    Remove-Item -Recurse C:\officeodt
+    while (Test-Path C:\officeodt) {
+        Write-Host "C:\officeodt could not the removed. Trying again in 3 seconds"...
+        Remove-Item -Recurse C:\officeodt
+    }
+    Write-Host "Mission complete"
+}
+function Invoke-OfficeInstall {
+    # Architecture selection
+    while (($arch = Read-Host "Architecture? (32 or 64)") -notin @("32", "64")) {
+        Write-Host "Invalid input. Please enter 32 or 64." -ForegroundColor Red
+    }
+
+    # Version selection
+    while (($version = Read-Host "Office version? (2016 or 365B or other)") -notin @("2016", "365B","other")) {
+        Write-Host "Invalid input. Please enter 2016 or 365B." -ForegroundColor Red
+    }
+    if ($version -in @("other")) {
+        $versionArray = @(
+            "AccessRetail",
+            "Access2019Retail",
+            "Access2021Retail",
+            "Access2024Retail",
+            "Access2019Volume",
+            "Access2021Volume",
+            "Access2024Volume",
+            "ExcelRetail",
+            "Excel2019Retail",
+            "Excel2021Retail",
+            "Excel2024Retail",
+            "Excel2019Volume",
+            "Excel2021Volume",
+            "Excel2024Volume",
+            "HomeBusinessRetail",
+            "HomeBusiness2019Retail",
+            "HomeBusiness2021Retail",
+            "HomeBusiness2024Retail",
+            "HomeStudentRetail",
+            "HomeStudent2019Retail",
+            "HomeStudent2021Retail",
+            "Home2024Retail",
+            "O365HomePremRetail",
+            "OneNoteFreeRetail",
+            "OneNoteRetail",
+            "OneNote2021Volume",
+            "OneNote2024Volume",
+            "OutlookRetail",
+            "Outlook2019Retail",
+            "Outlook2021Retail",
+            "Outlook2024Retail",
+            "Outlook2019Volume",
+            "Outlook2021Volume",
+            "Outlook2024Volume",
+            "Personal2019Retail",
+            "Personal2021Retail",
+            "PowerPointRetail",
+            "PowerPoint2019Retail",
+            "PowerPoint2021Retail",
+            "PowerPoint2024Retail",
+            "PowerPoint2019Volume",
+            "PowerPoint2021Volume",
+            "PowerPoint2024Volume",
+            "ProfessionalRetail",
+            "Professional2019Retail",
+            "Professional2021Retail",
+            "Professional2024Retail",
+            "ProjectProXVolume",
+            "ProjectPro2019Retail",
+            "ProjectPro2021Retail",
+            "ProjectPro2024Retail",
+            "ProjectPro2019Volume",
+            "ProjectPro2021Volume",
+            "ProjectPro2024Volume",
+            "ProjectStdRetail",
+            "ProjectStdXVolume",
+            "ProjectStd2019Retail",
+            "ProjectStd2021Retail",
+            "ProjectStd2024Retail",
+            "ProjectStd2019Volume",
+            "ProjectStd2021Volume",
+            "ProjectStd2024Volume",
+            "ProPlus2019Volume",
+            "ProPlus2021Volume",
+            "ProPlus2024Volume",
+            "ProPlusSPLA2021Volume",
+            "ProPlus2019Retail",
+            "ProPlus2021Retail",
+            "ProPlus2024Retail",
+            "PublisherRetail",
+            "Publisher2019Retail",
+            "Publisher2021Retail",
+            "Publisher2019Volume",
+            "Publisher2021Volume",
+            "Standard2019Volume",
+            "Standard2021Volume",
+            "StandardSPLA2021Volume",
+            "Standard2024Volume",
+            "VisioProXVolume",
+            "VisioPro2019Retail",
+            "VisioPro2021Retail",
+            "VisioPro2024Retail",
+            "VisioPro2019Volume",
+            "VisioPro2021Volume",
+            "VisioPro2024Volume",
+            "VisioStdRetail",
+            "VisioStdXVolume",
+            "VisioStd2019Retail",
+            "VisioStd2021Retail",
+            "VisioStd2024Retail",
+            "VisioStd2019Volume",
+            "VisioStd2021Volume",
+            "VisioStd2024Volume",
+            "WordRetail",
+            "Word2019Retail",
+            "Word2021Retail",
+            "Word2024Retail",
+            "Word2019Volume",
+            "Word2024Volume",
+            "Word2021Volume",
+            "O365ProPlusEEANoTeamsRetail",
+            "O365ProPlusRetail",
+            "O365BusinessEEANoTeamsRetail",
+            "O365BusinessRetail"
+        )
+        # Creating a hashtable from the array
+        $versionsHT = @{}
+        $validInputs = @()
+        for ($i = 0; $i -lt $versionArray.Count; $i++) {
+            $key = ($i + 1).ToString()
+            $versionsHT[$key] = $versionArray[$i]
+            $validInputs += $key
+        }
+        $validInputs += "exit"
+        
+        # User selection loop
+        $selectedKey = ""
+        while ($selectedKey -notin $validInputs) {
+            Clear-Host
+            $versionsHT.GetEnumerator() | Sort-Object { [int]$_.Key } | ForEach-Object {
+                Write-Host "$($_.Key): $($_.Value)"
+            }
+        
+            $selectedKey = Read-Host "Please enter a number from the list above or type 'exit' to cancel"
+            if ($selectedKey -notin $validInputs) {
+                Read-Host "Invalid input. Press Enter to try again"
+            }
+        }
+        
+        if ($selectedKey -ne "exit") {
+            $version = $versionsHT[$selectedKey]
+        } else {
+            return "Exiting"
+        }
+    }
+
+    Clear-Host
+    Install-Office $version $arch
+}
+
 Function Invoke-ReleaseRenew {
     Write-Host "Releasing and Renewing IP Address..." -ForegroundColor Magenta
     ipconfig /release
@@ -113,15 +341,23 @@ Function Get-CppRedist {
 }
 # Run Advanced IP Scanner
 Function Get-IPScanner {
-    Invoke-RestMethod https://download.advanced-ip-scanner.com/download/files/Advanced_IP_Scanner_2.5.4594.1.exe -Outfile C:\ipscanner.exe
-    Start-Process C:\ipscanner.exe
-    #Write-Host "Press Enter to go back (this will delete the app, make sure it's closed)" -ForegroundColor Cyan
+    $zipUrl = "https://github.com/treyob/lib/releases/download/v0.2/ipscanner.zip"
+    $targetDir = "C:\ipscanner"
+    Clear-Host; Write-Host "Downloading Advanced IP Scanner"
+    Start-BitsTransfer -Source $zipUrl -Destination "$env:TEMP\obsoftware\ipscanner.zip"
+    Clear-Host; Write-Host "Extracting Advanced IP Scanner"
+    Expand-Archive -Path "$env:TEMP\obsoftware\ipscanner.zip" -DestinationPath $targetDir -Force
+    Clear-Host; Write-Host "Running ipscanner"
+    Start-Process -FilePath "$targetDir\Advanced_IP_Scanner_2.5.4594.1.exe" -Verb RunAs
+    Clear-Host; Invoke-PounceCat "Advanced IP scanner should now be running." "This screen will exit when you close it."
     do {
-        $process = Get-Process | Get-Process | Where-Object { $_.Name -like "ipscanner*" }
+        $process = Get-Process -Name "Advanced_IP_Scanner_2.5.4594.1" -ErrorAction SilentlyContinue
         Start-Sleep -Seconds 1
     } while ($process)
-    Remove-Item C:\ipscanner.exe -Force
+    Remove-Item -Recurse -Force $targetDir, "$env:TEMP\obsoftware\ipscanner.zip"
 }
+
+
 # This function can determine the state of Bitlocker
 Function Get-BitlockerStatus {
     # Get Protection Status
@@ -457,6 +693,22 @@ Function Invoke-DotNetRepair {
     } while ($process)
     Remove-Item -Recurse -Force $targetDir
 }
+Function Invoke-TDOXDRW11Fix {
+    $installUrl = "https://github.com/treyob/lib/releases/download/v0.2/TDOXDRWin11Fix.exe"
+    $targetDir = "C:\TDOXDRWin11Fix"
+    Clear-Host; Write-Host "Installing and Starting .Net Repair Tool"
+    if (-Not (Test-Path -Path $targetDir)) {New-Item -ItemType Directory -Path $targetDir -Force | Out-Null}
+    Start-BitsTransfer -Source $installUrl -Destination "$targetDir\TDOXDRWin11Fix.exe"
+    Clear-Host; Write-Host "Downloading the script"
+    Start-Process -FilePath "$targetDir\TDOXDRWin11Fix.exe" -Verb RunAs
+    Clear-Host; Invoke-UltraCat "The fix should now be running." "This screen will exit when you close the installer."
+    Start-Sleep -Seconds 2
+    do {
+        $process = Get-Process -Name "TDOXDRWin11Fix" -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 1
+    } while ($process)
+    Remove-Item -Recurse -Force $targetDir
+}
 Function Invoke-NetScan {
     Clear-Host
     $Subnet = Read-Host "Enter subnet (e.g., 192.168.1)"
@@ -508,7 +760,7 @@ Function Invoke-NetScan {
 Function Invoke-TeamViewerQS {
     $installUrl = "https://www.teamviewer.com/link/?url=505374"
     $targetDir = "C:\TeamViewerQS"
-    Clear-Host; Write-Host "Dounloading and Starting TeamViewer"
+    Clear-Host; Write-Host "Downloading and Starting TeamViewer"
     if (-Not (Test-Path -Path $targetDir)) {New-Item -ItemType Directory -Path $targetDir -Force | Out-Null}
     Invoke-WebRequest -Uri $installUrl -OutFile "$targetDir\TeamViewerQS.exe"
     Clear-Host; Write-Host "Running TeamViewer"
@@ -519,4 +771,40 @@ Function Invoke-TeamViewerQS {
         Start-Sleep -Seconds 1
     } while ($process)
     Remove-Item -Recurse -Force $targetDir
+}
+
+Function Invoke-NewTeamViewerQS {
+    $installUrl = "https://www.teamviewer.com/link/?url=505374"
+    $targetDir = "C:\TeamViewerQS"
+    Clear-Host; Write-Host "Downloading and Starting TeamViewer"
+    if (-Not (Test-Path -Path $targetDir)) {New-Item -ItemType Directory -Path $targetDir -Force | Out-Null}
+    Start-BitsTransfer -Source $installUrl -Destination "$targetDir\TeamViewerQS.exe"
+    Clear-Host; Write-Host "Running TeamViewer"
+    Start-Process -FilePath "$targetDir\TeamViewerQS.exe" -Verb RunAs
+    Clear-Host; Invoke-PounceCat "TeamViewer should now be running."
+    do {
+        $process = Get-Process | Get-Process | Where-Object { $_.Name -like "TeamViewer*" }
+        Start-Sleep -Seconds 1
+    } while ($process)
+    Remove-Item -Recurse -Force $targetDir
+}
+
+Function Invoke-RevoUninstaller {
+    Clear-Host
+    $zipUrl = "https://81081bb5bd2a290e19d0-73f958688cc73e14784b0be099708265.ssl.cf1.rackcdn.com/RevoUninstaller_Portable.zip"
+    $targetDir = "C:\RevoUninstaller"
+    Clear-Host; Write-Host "Downloading RevoUninstaller"
+    Invoke-WebRequest -Uri $zipUrl -OutFile "$env:TEMP\obsoftware\RevoUninstaller.zip"
+    Clear-Host; Write-Host "Extracting RevoUninstaller"
+    New-Item -ItemType Directory $targetDir -Force
+    Expand-Archive -Path "$env:TEMP\obsoftware\RevoUninstaller.zip" -DestinationPath $targetDir -Force
+    Clear-Host; Write-Host "Running RevoUninstaller."
+    Start-Process -FilePath "$targetDir\RevoUninstaller_Portable\RevoUPort.exe" -Verb RunAs
+    Clear-Host; Invoke-PounceCat "RevoUninstaller should now be running." "This screen will exit when you close RevoUninstaller."
+    Start-Sleep -Seconds 3
+    do {
+        $process = Get-Process -Name "Revo*" -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 1
+    } while ($process)
+    Remove-Item -Recurse -Force $targetDir, "$env:TEMP\obsoftware\RevoUninstaller.zip"
 }
