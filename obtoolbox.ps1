@@ -35,6 +35,8 @@ if (-Not $testing) {
     Import-OBModules "https://github.com/obmmoreno/obwinrepair/releases/download/obwinrepair-v0.3/dentalsoftware.psm1"
 }
 
+$global:sound = $null
+
 do {
     # Set the PowerShell window/tab title
     $host.ui.RawUI.WindowTitle = "OverBytes Toolbox"
@@ -56,43 +58,26 @@ ________                   __________          __                     .____    .
 4. Get Device Serial Number                           > ^ <               22. .Net Repair Tool
 5. Run GPUpdate                                                           23. HWiNFO
 6. Flush and Register DNS                                                 24. TeamViewerQS
-7. Create Local User and Add to Administrators          |\     _,,,---,,_ 25. Revo Uninstaller
-8. Enable PSRemoting                             ZZZzz /,```.-'```'    -.  ;-;;,_
-9. Disable IPv6                                       |,4-  ) )-,_. ,\ (  `'-`'
-10. Enable Remote Desktop                            `'---`'`'(_/--`'  ```-`' \_) 
-11. Set Firewall Profiles to Allow All                                    26. Office Install
+"@ -ForegroundColor DarkCyan
+
+Write-Host "7. Create Local User and Add to Administrators" -ForegroundColor DarkCyan -NoNewLine;    Write-Host "    |\     _,,,---,,_       " -ForegroundColor Cyan -NoNewLine; Write-Host "25. Revo Uninstaller" -ForegroundColor DarkCyan
+Write-Host "8. Enable PSRemoting                       "    -ForegroundColor DarkCyan -NoNewLine; Write-Host "ZZZzz /, ```.-'```'    -.  ;-;;,_  " -ForegroundColor Cyan -NoNewLine; Write-Host "26. Office Install" -ForegroundColor DarkCyan
+Write-Host "9. Disable IPv6                            "    -ForegroundColor DarkCyan -NoNewLine; Write-Host "     |,4-  ) )-,_.  ,\ (   `'-`' " -ForegroundColor Cyan -NoNewLine; Write-Host "27. Hold Music Section" -ForegroundColor DarkCyan
+Write-Host "10. Enable Remote Desktop                  "    -ForegroundColor DarkCyan -NoNewLine; Write-Host "    `'---`'`'(_/--`'  ```-`' \_) " -ForegroundColor Cyan
+
+Write-Host @"
+11. Set Firewall Profiles to Allow All
 12. CheckDisk C:\
 13. Download and Install Microsoft Visual C++ 2015-2022 
 "@ -ForegroundColor DarkCyan
-# Line 1
-Write-Host "14. Dental Software Section                 " -ForegroundColor DarkCyan -NoNewLine
-Write-Host '     ___' -ForegroundColor Cyan
-
-# Line 2
-Write-Host "15. Server Power and Bitlocker Options      " -ForegroundColor DarkCyan -NoNewLine 
-Write-Host ' _.-|   |          |\__/,|   (`\' -ForegroundColor Cyan
-
-# Line 3
-Write-Host "16. Set Adobe Security Settings             " -ForegroundColor DarkCyan -NoNewLine
-Write-Host '{   |   |          |o o  |__ _) )' -ForegroundColor Cyan
-
-# Line 4
-Write-Host "17. Get Domain Computers Info from DC       " -ForegroundColor DarkCyan -NoNewLine
-Write-Host ' "-.|___|        _.( T   )  `  /' -ForegroundColor Cyan
-
-# Line 5
-Write-Host "18. Support Numbers                         " -ForegroundColor DarkCyan -NoNewLine
-Write-Host "   .--'-`-.     _((_ `^--' /_<  \\" -ForegroundColor Cyan
-
-# Line 6
-Write-Host "00. Exit                                    " -ForegroundColor DarkCyan -NoNewLine
-Write-Host '.+|______|__.-||__)`-''(((/  (((/' -ForegroundColor Cyan
+Write-Host "14. Dental Software Section                 " -ForegroundColor DarkCyan -NoNewLine; Write-Host '     ___' -ForegroundColor Cyan
+Write-Host "15. Server Power and Bitlocker Options      " -ForegroundColor DarkCyan -NoNewLine; Write-Host ' _.-|   |          |\__/,|   (`\' -ForegroundColor Cyan
+Write-Host "16. Set Adobe Security Settings             " -ForegroundColor DarkCyan -NoNewLine; Write-Host '{   |   |          |o o  |__ _) )' -ForegroundColor Cyan
+Write-Host "17. Get Domain Computers Info from DC       " -ForegroundColor DarkCyan -NoNewLine; Write-Host ' "-.|___|        _.( T   )  `  /' -ForegroundColor Cyan
+Write-Host "18. Support Numbers                         " -ForegroundColor DarkCyan -NoNewLine; Write-Host "   .--'-`-.     _((_ `^--' /_<  \\" -ForegroundColor Cyan
+Write-Host "00. Exit                                    " -ForegroundColor DarkCyan -NoNewLine; Write-Host '.+|______|__.-||__)`-''(((/  (((/' -ForegroundColor Cyan
 
     $choice = Read-Host "Enter the number of your choice"
-
-# Release and Renew the IP Address
-
-
 # Main Menu Switch
 switch ($choice) {
     "1" { Invoke-ReleaseRenew }
@@ -113,34 +98,41 @@ switch ($choice) {
     "16" { Set-AdobeSettings; Invoke-UltraCat "Press Enter to Continue"; Read-Host }
     "17" { Get-ADDeviceInfo; Pause }
     "18" { Clear-Host
-        Write-Host "****Practice Management****" -ForegroundColor Green
-        Write-Host @"
-Eaglesoft - 800-475-5036
-Dentrix - 800-336-8749
-Open Dental - 503-363-5432
-Softdent - 866-435-7473
-PracticeWorks - 800-603-4438
-Curve - 888-910-4376
-OrthoEdge2 - 800-346-4504
-CareStack - 407-833-6123
-TDO - 858-558-3696 
-"@ -ForegroundColor DarkCyan
-        Write-Host "****Imaging****" -ForegroundColor Green
-        Write-Host @"
-DTX - 833-389-2255
-Sirona (Schick\Sidexis) - 800-861-5098
-Apteryx - 800-861-5098
-Vatech (EZDent) - 888-396-6872
-Invivio 888-883-3947
-SmartScan - 888-883-3947
-Dexis - 888-883-3947
-ImageXL - 866-450-6717
-Vixwin - 888-883-3497
-SOTA Imaging - 714-523-6100
-SiCat - 800-550-9961
-Carestream - 866-724-6317
-Ray Medical - 800-976-4586
-"@ -ForegroundColor DarkCyan
+# Practice Management Systems
+$practiceSystems = @(
+    [PSCustomObject]@{ Name = 'Eaglesoft';              Phone = '800-475-5036' }
+    [PSCustomObject]@{ Name = 'Dentrix';                Phone = '800-336-8749' }
+    [PSCustomObject]@{ Name = 'Open Dental';            Phone = '503-363-5432' }
+    [PSCustomObject]@{ Name = 'Softdent';               Phone = '866-435-7473' }
+    [PSCustomObject]@{ Name = 'Practiceworks';          Phone = '800-603-4438' }
+    [PSCustomObject]@{ Name = 'Curve';                  Phone = '888-910-4376' }
+    [PSCustomObject]@{ Name = 'OrthoEdge2';             Phone = '800-346-4504' }
+    [PSCustomObject]@{ Name = 'Carestack';              Phone = '407-833-6123' }
+    [PSCustomObject]@{ Name = 'TDO';                    Phone = '858-558-3696' }
+)
+
+Write-Host "Practice Management Systems" -ForegroundColor Green
+$practiceSystems | Format-Table -AutoSize
+
+# Imaging Systems
+$imagingSystems = @(
+    [PSCustomObject]@{ Name = 'DTX';                           Phone = '833-389-2255' }
+    [PSCustomObject]@{ Name = 'Sirona (Sidexis\Schick)';       Phone = '800-659-5977' }
+    [PSCustomObject]@{ Name = 'Apteryx';                       Phone = '800-861-5098' }
+    [PSCustomObject]@{ Name = 'Vatech EZDent';                 Phone = '888-396-6872' }
+    [PSCustomObject]@{ Name = 'Invivo';                        Phone = '888-883-3947' }
+    [PSCustomObject]@{ Name = 'SmartScan Studio';              Phone = '888-883-3947' }
+    [PSCustomObject]@{ Name = 'Dexis 9 & 10';                  Phone = '888-883-3947' }
+    [PSCustomObject]@{ Name = 'ImageXL';                       Phone = '866-450-6717' }
+    [PSCustomObject]@{ Name = 'Vixwin';                        Phone = '888-883-3947' }
+    [PSCustomObject]@{ Name = 'SOTA Imaging';                  Phone = '714-532-6100' }
+    [PSCustomObject]@{ Name = 'JMorita\i-Dixel';               Phone = '800-831-3222' }
+    [PSCustomObject]@{ Name = 'Sicat';                         Phone = '800-550-9961' }
+    [PSCustomObject]@{ Name = 'Ray Medical (SmartDent)';       Phone = '800-976-4586' }
+    [PSCustomObject]@{ Name = 'Acteon';                        Phone = '800-289-6367' }
+)
+Write-Host "`nImaging Software" -ForegroundColor Green
+$imagingSystems | Format-Table -AutoSize
         Read-Host "Press Enter to go back"}
     "19" { Invoke-NetScan }
     "20" { Start-Process powershell.exe -ArgumentList "-NoProfile -WindowStyle Hidden -Command & {Import-Module '$env:TEMP\obsoftware\ob.psm1'; Get-IPScanner; pause}" -Verb RunAs
@@ -149,7 +141,7 @@ Ray Medical - 800-976-4586
         Read-Host "WizTree is downloading in the background and will start in a moment"
         }
     "22" { Start-Job -ScriptBlock { Import-Module "$env:TEMP\obsoftware\ob.psm1"; Invoke-DotNetRepair; Exit } > $null
-        Read-Host "HWiNFO is downloading in the background and will start in a moment"
+        Read-Host ".NET Repair tool is downloading in the background and will start in a moment"
         }
     "23" { Start-Job -ScriptBlock { Import-Module "$env:TEMP\obsoftware\ob.psm1"; Invoke-HWInfo; Exit } > $null
         Read-Host "HWiNFO is downloading in the background and will start in a moment"
@@ -160,6 +152,23 @@ Ray Medical - 800-976-4586
     "25" { Start-Job -ScriptBlock { Import-Module "$env:TEMP\obsoftware\ob.psm1"; Invoke-RevoUninstaller; Exit } > $null 
         Read-Host "Revo Uninstaller is downloading in the background and will start in a moment" }
     "26" { Start-Process powershell.exe -ArgumentList "-NoExit", "-Command", "Import-Module '$env:TEMP\obsoftware\ob.psm1'; Invoke-OfficeInstall; Exit" }
-    "00" { Remove-Item -Recurse -Force "$env:TEMP\obsoftware"; Write-Host "Cleaned up module files"; $choice = "000"}
+    "27" { 
+        #if ($global:holdMusicPlaying -eq $true) {
+        #    Stop-HoldMusic
+        #    $global:holdMusicPlaying = $false
+        #    Write-Host "Hold music stopped" -ForegroundColor Green
+        #} else {
+        #    Start-HoldMusic
+        #    $global:holdMusicPlaying = $true
+        #    Write-Host "Hold music started" -ForegroundColor Green
+        #}
+        #Read-Host "Press Enter to continue"}
+        Invoke-HoldMusicSection
+        }
+    "00" { Remove-Item -Recurse -Force "$env:TEMP\obsoftware"
+        Write-Host "Cleaned up module files"
+        Stop-HoldMusic
+        $global:holdMusicPlaying = $false
+        $choice = "000" }
     }
 } while ($choice -ne "000")
