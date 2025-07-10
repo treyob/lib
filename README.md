@@ -6,6 +6,7 @@ A comprehensive PowerShell-based toolkit for Windows system maintenance, trouble
 
 ## Features
 
+- Dental software fixes and tools (EZDent, Eaglesoft, etc.)
 - Release and renew IP address  
 - Repair Windows system files (SFC and DISM)  
 - Reset print spooler  
@@ -16,11 +17,18 @@ A comprehensive PowerShell-based toolkit for Windows system maintenance, trouble
 - Enable PSRemoting and Remote Desktop  
 - Disable IPv6  
 - Set firewall profiles  
-- Disk check and .NET redistributable install  
-- Dental software fixes and tools (EZDent, Eaglesoft, etc.)  
+- Disk check and .NET redistributable install   
 - Network scanning tools  
 - Hardware info, remote access, and uninstall utilities  
 - Office installation and hold music playback support  
+
+---
+
+## Most used dental scripts
+
+- Eaglesoft unable to connect to server fix
+- Eaglesoft hexadecimal error fix
+- Mouthwatch camera driver installer
 
 ---
 
