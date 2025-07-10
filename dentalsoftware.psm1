@@ -1,5 +1,7 @@
 # Dental Software Fixes
 Function Invoke-EZDentDLLFix {
+    [CmdletBinding()]
+    param()
     $dllSourcePath = "C:\EzSensor\libiomp5md.dll"
     $dllDestinationPath = "C:\Program Files (x86)\VATECH\EZDent-i\bin"
     
@@ -22,6 +24,8 @@ Function Invoke-EZDentDLLFix {
     Read-Host
 }
 Function Invoke-ESServConnectFix {
+    [CmdletBinding()]
+    param()
     $mcSourcePath = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\Config\machine.config"
     $mcdSourcePath = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\Config\machine.config.default"
     $mcDestinationPath = "C:\Windows\Microsoft.NET\Framework\v4.0.30319\Config\machine.config"
@@ -35,7 +39,7 @@ Function Invoke-ESServConnectFix {
             Write-Host "Operation completed. 'machine.config' copied successfully." -ForegroundColor DarkGreen
         }
         catch {
-            Write-Host "An error occurred while copying the 'machine.config': $_" -ForegroundColor Redaa
+            Write-Host "An error occurred while copying the 'machine.config': $_" -ForegroundColor Red
         }
     }
     else {
@@ -95,11 +99,13 @@ Function Invoke-ESHexDecFix {
     }
 }
 Function Clear-EZCache {
+    [CmdletBinding()]
+    param()
     $ezCachePath = "C:\Program Files (x86)\VATECH\EzDent-i\Cache"
     $firstLoop = $true  # Flag to track the first loop iteration
     # Make sure the folder exists
     if (-Not (Test-Path -PathType Container -Path $ezCachePath)) {
-        Write-Warning "EZDent cache folder not found! Exiting"; Pause
+        Write-Warning "EZDent cache folder not found! Exiting"; Read-Host "Press Enter to continue"
         return
     } else {
         Write-Host "Found EZDent cache folder, continuing"
@@ -123,10 +129,51 @@ Function Clear-EZCache {
     } while ($ez3DRunning -or $ezDentIRunning)
     Remove-Item -Recurse $ezCachePath -Force
     if (-Not (Test-Path -PathType Container -Path $ezCachePath)) {
-        Write-Host "EZDent cache successfully cleared" -ForegroundColor DarkGreen; Pause
+        Write-Host "EZDent cache successfully cleared" -ForegroundColor DarkGreen; Read-Host "Press Enter to continue"
     } else {
         Write-Warning "Something went wrong. EZDent cache could not be deleted. You can try manually. `nPath: $ezCachePath"; pause
     }
+}
+
+# Helper functions for Dental Software Section
+Function Open-ExternalLink {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$Url
+    )
+    # Open with default browser associated with URLs using multiple fallbacks
+    try {
+        [System.Diagnostics.Process]::Start($Url) | Out-Null
+    } catch {
+        try {
+            Start-Process -FilePath $Url -ErrorAction Stop
+        } catch {
+            Start-Process "cmd.exe" -ArgumentList "/c start `""" + $Url + "`""" -WindowStyle Hidden
+        }
+    }
+}
+
+Function Invoke-SmartDocScannerFix {
+    [CmdletBinding()]
+    param()
+    Start-Process "cmd.exe" -ArgumentList "/c", '"C:\Eaglesoft\Shared Files\setupdocmgr64.bat"' -WorkingDirectory "C:\Eaglesoft\Shared Files"
+    Write-Host "Remember to set the scanner to the corresponding WIA-Printer in"
+    Write-Host "Eaglesoft > File > Preferences > X-Ray Tab > Scanner" -ForegroundColor DarkCyan
+    Read-Host "Press Enter to dismiss"
+}
+
+Function Install-MouthwatchDrivers {
+    [CmdletBinding()]
+    param()
+    Clear-Host
+    Write-Host "Downloading mouthwatch to C:\mouthwatch.exe"
+    Start-BitsTransfer "https://mouthwatch.com/wp-content/uploads/downloads/setupmouthwatch.exe" -Destination "C:\mouthwatch.exe"
+    Invoke-UltraCat "Running Mouthwatch. Install files will be deleted" " when mouthwatch is closed"; Start-Process "C:\mouthwatch.exe"
+    do {
+        $process = Get-Process -Name "mouthwatch" -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 1
+    } while ($process)
+    Remove-Item -Recurse -Force "C:\mouthwatch.exe"
 }
 
 Function Invoke-DentalSoftwareSection {
@@ -154,68 +201,26 @@ Function Invoke-DentalSoftwareSection {
 8. Schick Drivers                                   
 9. Install Mouthwatch Drivers                                    
 10 TDO XDR Sensor Fix for Win11: TDO crashes when taking intraoral X-Rays
+11. Dentrix Installation and Migration Tool
 
 00. Exit Dental Software Section                               
 "@
 $dentalChoice = Read-Host "Enter the number of your choice"
     
-# Function to run dental software section
-        function Get-DentalSoftwareFix {
-            param (
-                [string]$choice
-            )
-            # Vatech fixes
-            if ($choice -in @("ezdent-i", "clear ezdent cache")) { 
-                if ($choice -eq "ezdent-i") { & Invoke-EZDentDLLFix } 
-                else { Clear-EZCache }
-            }
-            # Web links to open section
-            elseif ($choice -in @("schick","eaglesoft","schickes24")) {
-                $link = if ($choice -eq "schick") { 'https://www.dentsplysironasupport.com/en-us/user_section/user_section_imaging/schick_brand_software.html' } 
-                elseif ($choice -eq "eaglesoft") { 'https://pattersonsupport.custhelp.com/app/answers/detail/a_id/23400#New%20Server' }
-                else {'https://pattersonsupport.custhelp.com/app/answers/detail/a_id/44313/kw/44313'}
-                Start-Process msedge.exe "--new-window $link"
-            }
-            elseif ($choice -in @("eaglesoft machine.config","eaglesoft hexdec","smartdoc1scan")) {
-                if ($choice -eq "eaglesoft machine.config") {Invoke-ESServConnectFix} 
-                elseif ($choice -eq "smartdoc1scan") { 
-                    Start-Process "cmd.exe" -ArgumentList "/c", '"C:\Eaglesoft\Shared Files\setupdocmgr64.bat"' -WorkingDirectory "C:\Eaglesoft\Shared Files"
-                    Write-Host "Remember to set the scanner to the corresponding WIA-Printer in"
-                    Write-Host "Eaglesoft > File > Preferences > X-Ray Tab > Scanner" -ForegroundColor DarkCyan
-                    Read-Host "Press Enter to dismiss"
-                }
-                else {& Invoke-ESHexDecFix; Read-Host "Press enter to dismiss"}
-            }
-            # Mouthwatch Download
-            else {
-                    Clear-Host
-                    Write-Host "Downloading mouthwatch to C:\mouthwatch.exe"
-                    Start-BitsTransfer "https://mouthwatch.com/wp-content/uploads/downloads/setupmouthwatch.exe" -Destination "C:\mouthwatch.exe"
-                    Invoke-UltraCat "Running Mouthwatch. Install files will be deleted" " when mouthwatch is closed"; Start-Process "C:\mouthwatch.exe"
-                    do {
-                        $process = Get-Process -Name "mouthwatch" -ErrorAction SilentlyContinue
-                        Start-Sleep -Seconds 1
-                    } while ($process)
-                    Remove-Item -Recurse -Force "C:\mouthwatch.exe"
-            }
-        }
+
         switch ($dentalChoice) {
-            "1" { Get-DentalSoftwareFix -choice "eaglesoft machine.config" }
-            "2" { Get-DentalSoftwareFix -choice "eaglesoft hexdec" }
-            "3" { Get-DentalSoftwareFix -choice "smartdoc1scan" }
-            "4" { Get-DentalSoftwareFix -choice "eaglesoft" }
-            "5" { Get-DentalSoftwareFix -choice "schickes24" }
-            "6" { Get-DentalSoftwareFix -choice "ezdent-i" }
-            "7" { Get-DentalSoftwareFix -choice "clear ezdent cache" }
-            "8" { Get-DentalSoftwareFix -choice "schick" }
-            "9" { Get-DentalSoftwareFix -choice "mouthwatch" }
+            "1"  { Invoke-ESServConnectFix }
+            "2"  { Invoke-ESHexDecFix; Read-Host "Press enter to dismiss" }
+            "3"  { Invoke-SmartDocScannerFix }
+            "4"  { Open-ExternalLink 'https://pattersonsupport.custhelp.com/app/answers/detail/a_id/23400#New%20Server' }
+            "5"  { Open-ExternalLink 'https://pattersonsupport.custhelp.com/app/answers/detail/a_id/44313/kw/44313' }
+            "6"  { Invoke-EZDentDLLFix }
+            "7"  { Clear-EZCache }
+            "8"  { Open-ExternalLink 'https://www.dentsplysironasupport.com/en-us/user_section/user_section_imaging/schick_brand_software.html' }
+            "9"  { Install-MouthwatchDrivers }
             "10" { Start-Job -ScriptBlock { Import-Module "$env:TEMP\obsoftware\ob.psm1"; Invoke-TDOXDRW11Fix; Exit } > $null }
-            "00" { Write-Host "Exiting Dental Software Section" }
-            
-            Default {
-                Write-Host "Invalid choice. Please select a valid option." -ForegroundColor Red
-                Read-Host "Press Enter to try again"
-            }
+            "11" { Start-Job -ScriptBlock { Import-Module "$env:TEMP\obsoftware\ob.psm1"; Invoke-DentrixInstallMigrateTool; Exit } > $null 
+        Read-Host "Dentrix Installation and Migration tool is downloading in the background and will start in a moment" }
         }
-    } while ($dentalchoice -ne "00") 
+    } while ($dentalChoice -ne "00")
 }
