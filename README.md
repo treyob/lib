@@ -29,4 +29,12 @@ A comprehensive PowerShell-based toolkit for Windows system maintenance, trouble
 Run the script directly from PowerShell with the following command:
 
 ```powershell
+
 irm overbytestech.com/repair | iex
+```
+If you run into SSL errors, run the following command:
+
+```powershell
+
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; irm overbytestech.com/repair | iex
+```
