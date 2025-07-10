@@ -789,6 +789,22 @@ Function Invoke-NewTeamViewerQS {
     Remove-Item -Recurse -Force $targetDir
 }
 
+Function Invoke-DentrixInstallMigrateTool {
+    $installUrl = "https://dentrix.com/support/core/MigrationAndInstallTool.exe"
+    $targetDir = "C:\DentrixInstallMigrateTool"
+    Clear-Host; Write-Host "Downloading and Starting Dentrix Installation and Migration tool"
+    if (-Not (Test-Path -Path $targetDir)) {New-Item -ItemType Directory -Path $targetDir -Force | Out-Null}
+    Start-BitsTransfer -Source $installUrl -Destination "$targetDir\DentrixInstallMigrateTool.exe"
+    Clear-Host; Write-Host "Running the tool"
+    Start-Process -FilePath "$targetDir\DentrixInstallMigrateTool.exe" -Verb RunAs
+    Clear-Host; Invoke-PounceCat "Dentrix Installation and Migration tool should now be running."
+    do {
+        $process = Get-Process | Get-Process | Where-Object { $_.Name -like "DentrixInstallMigrateTool" }
+        Start-Sleep -Seconds 1
+    } while ($process)
+    Remove-Item -Recurse -Force $targetDir
+}
+
 Function Invoke-RevoUninstaller {
     Clear-Host
     $zipUrl = "https://81081bb5bd2a290e19d0-73f958688cc73e14784b0be099708265.ssl.cf1.rackcdn.com/RevoUninstaller_Portable.zip"
@@ -807,4 +823,63 @@ Function Invoke-RevoUninstaller {
         Start-Sleep -Seconds 1
     } while ($process)
     Remove-Item -Recurse -Force $targetDir, "$env:TEMP\obsoftware\RevoUninstaller.zip"
+}
+
+#Function Start-HoldMusic {
+#    param ()
+#    if (-Not (Test-Path -Path "$env:temp\obsoftware\hold.wav")) {
+#        Write-Host "Downloading hold music"
+#        Start-BitsTransfer -Source "https://github.com/treyob/lib/releases/download/v0.2/opus.no.1.wav" -Destination "$env:temp\obsoftware\hold.wav" > $null
+#    }
+#    $global:sound = New-Object System.Media.SoundPlayer "$env:temp\obsoftware\hold.wav"
+#    $global:sound.PlayLooping()
+#}
+#
+#Function Stop-HoldMusic {
+#    if ($global:sound -ne $null) {
+#        $global:sound.Stop()
+#        $global:sound.Dispose()
+#        $global:sound = $null
+#    }
+#}
+Function Start-HoldMusic {
+    param (
+        [string]$link,
+        [string]$songName
+    )
+    Stop-HoldMusic
+    if (-Not (Test-Path -Path "$env:temp\obsoftware\$songName.wav")) {
+        Write-Host "Downloading hold music"
+        Start-BitsTransfer -Source "$link" -Destination "$env:temp\obsoftware\$songName.wav" > $null
+    }
+    $global:sound = New-Object System.Media.SoundPlayer "$env:temp\obsoftware\$songName.wav"
+    $global:sound.PlayLooping()
+}
+
+Function Stop-HoldMusic {
+    if ($null -ne $global:sound) {
+        $global:sound.Stop()
+        $global:sound.Dispose()
+        $global:sound = $null
+    }
+}
+function Invoke-HoldMusicSection {
+    param ()
+    do {
+        Clear-Host
+        Write-Host "Hold Music Section`n" -ForegroundColor DarkCyan
+        $holdMusicTable = @(
+            [PSCustomObject]@{ Option = '1. Other'; Song = 'Opus No. 1 - Tim Carleton'}
+            [PSCustomObject]@{ Option = '2. Dexis'; Song = '12 Spanish Dances in G Major Arr. for Guitar'}
+            [PSCustomObject]@{ Option = '3. Stop Music'}
+        )
+        $holdMusicTable | Format-Table -AutoSize
+
+        switch ($musicChoice) {
+            "1" { Start-HoldMusic -link 'https://github.com/treyob/lib/releases/download/v0.2/opus.no.1.wav' -songName 'Opus No. 1 - Tim Carleton' }
+            "2" { Start-HoldMusic -link 'https://github.com/treyob/lib/releases/download/v0.2/12.span.dance.wav' -songName '12 Spanish Dances in G Major Arr. for Guitar' }
+            "3" { Stop-HoldMusic }
+        }
+        $musicChoice = Read-Host "Enter the number of your choice, or press enter to exit"
+    } while ($musicChoice -ne "")
 }
