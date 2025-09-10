@@ -7,7 +7,8 @@ Write-Host "Setting TLS settings for script execution"
 $testing = $false
 $modulearray = @(
     "https://github.com/treyob/lib/releases/download/v0.2/dentalsoftware.psm1",
-    "https://github.com/treyob/lib/releases/download/v0.2/ob.psm1"
+    "https://github.com/treyob/lib/releases/download/v0.2/ob.psm1",
+    ""
 )
 Function Import-OBModules {
     param($psm1Url)
@@ -152,19 +153,7 @@ $imagingSystems | Format-Table -AutoSize
     "25" { Start-Job -ScriptBlock { Import-Module "$env:TEMP\obsoftware\ob.psm1"; Invoke-RevoUninstaller; Exit } > $null 
         Read-Host "Revo Uninstaller is downloading in the background and will start in a moment" }
     "26" { Start-Process powershell.exe -ArgumentList "-NoExit", "-Command", "Import-Module '$env:TEMP\obsoftware\ob.psm1'; Invoke-OfficeInstall; Exit" }
-    "27" { 
-        #if ($global:holdMusicPlaying -eq $true) {
-        #    Stop-HoldMusic
-        #    $global:holdMusicPlaying = $false
-        #    Write-Host "Hold music stopped" -ForegroundColor Green
-        #} else {
-        #    Start-HoldMusic
-        #    $global:holdMusicPlaying = $true
-        #    Write-Host "Hold music started" -ForegroundColor Green
-        #}
-        #Read-Host "Press Enter to continue"}
-        Invoke-HoldMusicSection
-        }
+    "27" { Invoke-HoldMusicSection }
     "00" { Remove-Item -Recurse -Force "$env:TEMP\obsoftware"
         Write-Host "Cleaned up module files"
         Stop-HoldMusic

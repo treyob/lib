@@ -63,6 +63,8 @@ Function Invoke-ESServConnectFix {
     Read-Host
 }
 Function Invoke-ESHexDecFix {
+    [CmdletBinding()]
+    param()
     $userProfile = [System.Environment]::GetFolderPath('UserProfile')
     $pattersonPath = Join-Path -Path $userProfile -ChildPath 'AppData\Local\Patterson_Companies'
     # Check if the folder exists
@@ -134,25 +136,7 @@ Function Clear-EZCache {
         Write-Warning "Something went wrong. EZDent cache could not be deleted. You can try manually. `nPath: $ezCachePath"; pause
     }
 }
-
 # Helper functions for Dental Software Section
-Function Open-ExternalLink {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory)][string]$Url
-    )
-    # Open with default browser associated with URLs using multiple fallbacks
-    try {
-        [System.Diagnostics.Process]::Start($Url) | Out-Null
-    } catch {
-        try {
-            Start-Process -FilePath $Url -ErrorAction Stop
-        } catch {
-            Start-Process "cmd.exe" -ArgumentList "/c start `""" + $Url + "`""" -WindowStyle Hidden
-        }
-    }
-}
-
 Function Invoke-SmartDocScannerFix {
     [CmdletBinding()]
     param()
@@ -161,7 +145,6 @@ Function Invoke-SmartDocScannerFix {
     Write-Host "Eaglesoft > File > Preferences > X-Ray Tab > Scanner" -ForegroundColor DarkCyan
     Read-Host "Press Enter to dismiss"
 }
-
 Function Install-MouthwatchDrivers {
     [CmdletBinding()]
     param()
@@ -174,6 +157,30 @@ Function Install-MouthwatchDrivers {
         Start-Sleep -Seconds 1
     } while ($process)
     Remove-Item -Recurse -Force "C:\mouthwatch.exe"
+
+
+
+}
+function Install-ESDexisSensorIntegration {
+    param (
+        [string]$DownloadUrl = "https://obtoolbox-public.s3.us-east-2.amazonaws.com/3rd-party-tools/Gendex_Dexis_Integration.reg",
+        [string]$DestinationPath = "$env:TEMP\obsoftware\Gendex_Dexis_Integration.reg"
+    )
+
+    try {
+        Write-Host "Downloading .reg file from $DownloadUrl..." -ForegroundColor Cyan
+        Invoke-WebRequest -Uri $DownloadUrl -OutFile $DestinationPath -UseBasicParsing
+        Write-Host "Download complete. File saved to $DestinationPath" -ForegroundColor Green
+
+        Write-Host "Importing registry file..." -ForegroundColor Cyan
+        Start-Process -FilePath "reg.exe" -ArgumentList "import `"$DestinationPath`"" -Verb RunAs -Wait
+
+        Write-Host "Registry file successfully imported." -ForegroundColor Green
+        Start-Sleep -Seconds 2
+    }
+    catch {
+        Write-Error "An error occurred: $_"
+    }
 }
 
 Function Invoke-DentalSoftwareSection {
@@ -188,20 +195,27 @@ Function Invoke-DentalSoftwareSection {
     DriverInit Failed when scanning                     _._     _,-'""```-._
 4. Eaglesoft Download                                 (,-.```._,'(       |\```-/| 
 5. Schick with Eaglesoft 24                                ```-.-' \ )-```( , o o)
-                                                                  ```-    \```_`"'-"
+6. Eaglesoft Dexis/Gendex sensor integration                      ```-    \```_`"'-"
 "@
     Write-Host "VATECH" -ForegroundColor DarkYellow                                                
     Write-Host @" 
-6. EzDent-i Fix: libiomp5md.dll error during IO acquisition
-7. Clear EzDent Cache
+7. EzDent-i Fix: libiomp5md.dll error during IO acquisition
+8. Clear EzDent Cache
+
+"@
+    Write-Host "Sirona" -ForegroundColor DarkYellow                                                
+    Write-Host @" 
+9. Schick Drivers 
+10. Schick sensor Curve Hero documentation
+11. Sidexis Migration Section
 
 "@
     Write-Host "Others" -ForegroundColor DarkYellow                                                
     Write-Host @" 
-8. Schick Drivers                                   
-9. Install Mouthwatch Drivers                                    
-10 TDO XDR Sensor Fix for Win11: TDO crashes when taking intraoral X-Rays
-11. Dentrix Installation and Migration Tool
+
+12. Install Mouthwatch Drivers                                    
+13 TDO XDR Sensor Fix for Win11: TDO crashes when taking intraoral X-Rays
+14. Dentrix Installation and Migration Tool
 
 00. Exit Dental Software Section                               
 "@
@@ -210,16 +224,19 @@ $dentalChoice = Read-Host "Enter the number of your choice"
 
         switch ($dentalChoice) {
             "1"  { Invoke-ESServConnectFix }
-            "2"  { Invoke-ESHexDecFix; Read-Host "Press enter to dismiss" }
+            "2"  { Invoke-ESHexDecFix }
             "3"  { Invoke-SmartDocScannerFix }
             "4"  { Open-ExternalLink 'https://pattersonsupport.custhelp.com/app/answers/detail/a_id/23400#New%20Server' }
             "5"  { Open-ExternalLink 'https://pattersonsupport.custhelp.com/app/answers/detail/a_id/44313/kw/44313' }
-            "6"  { Invoke-EZDentDLLFix }
-            "7"  { Clear-EZCache }
-            "8"  { Open-ExternalLink 'https://www.dentsplysironasupport.com/en-us/user_section/user_section_imaging/schick_brand_software.html' }
-            "9"  { Install-MouthwatchDrivers }
-            "10" { Start-Job -ScriptBlock { Import-Module "$env:TEMP\obsoftware\ob.psm1"; Invoke-TDOXDRW11Fix; Exit } > $null }
-            "11" { Start-Job -ScriptBlock { Import-Module "$env:TEMP\obsoftware\ob.psm1"; Invoke-DentrixInstallMigrateTool; Exit } > $null 
+            "6"  { Install-ESDexisSensorIntegration }
+            "7"  { Invoke-EZDentDLLFix }
+            "8"  { Clear-EZCache }
+            "9"  { Open-ExternalLink 'https://www.dentsplysironasupport.com/en-us/user_section/user_section_imaging/schick_brand_software.html' }
+            "10"  { Open-ExternalLink 'https://curvebulkdata-live.s3.amazonaws.com/35a4ab0e-5b82-4543-9eb9-4d1884e041b2/stored_files/843_68752747c6b9b_Schick_Legacy_Driver_Installation.pdf?response-content-disposition=inline%3B%20filename%2A%3DUTF-8%27%27Schick%2520Legacy%2520Driver%2520Installation.pdf&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAWM5JH3YWMSWI32JV%2F20250714%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20250714T155053Z&X-Amz-SignedHeaders=host&X-Amz-Expires=43200&X-Amz-Signature=2e1353fb90eeb0374c10f1043ba5c0b9e2b79fb8fd5be6b4b35ef1f239cb490b' }
+            "11" { Open-SidexisMigrationSection }
+            "12" { Install-MouthwatchDrivers }
+            "13" { Start-Job -ScriptBlock { Import-Module "$env:TEMP\obsoftware\ob.psm1"; Invoke-TDOXDRW11Fix; Exit } > $null }
+            "14" { Start-Job -ScriptBlock { Import-Module "$env:TEMP\obsoftware\ob.psm1"; Invoke-DentrixInstallMigrateTool; Exit } > $null 
         Read-Host "Dentrix Installation and Migration tool is downloading in the background and will start in a moment" }
         }
     } while ($dentalChoice -ne "00")

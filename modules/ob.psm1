@@ -1,103 +1,22 @@
-function Install-Office {
-    param (
-        [string]$version,
-        [int]$arch
-    )
-    $xmlPath = "C:\officeodt\officeodt-$version-x$arch.xml"
-    $officeODTlink = "https://download.microsoft.com/download/6c1eeb25-cf8b-41d9-8d0d-cc1dbc032140/officedeploymenttool_18623-20156.exe"
-    if (-Not (Test-Path -PathType Container "C:\officeodt")) {
-        mkdir c:\officeodt > $null
-        Write-Host "Created the C:\officeodt directory"
-    }
-    # Define your variables
-    switch ($version) {
-        "4" { $version = "HomeBusiness2019Retail"}
-        "3" { $version = "HomeBusiness2021Retail" }
-        "2" { $version = "HomeBusiness2024Retail" }
-        "1" { $version = "O365ProPlusRetail" }
-    }
-    if ((Read-Host "Would you like to exclude OneDrive? (Y/n)") -notin @("n","N","no")) {
-        $excludeOneDrive = '<ExcludeApp ID="OneDrive" />'
-    }
-
-    # Create the XML content with variable substitution
-    $xmlContent = @"
-<Configuration>
-  <Add SourcePath="C:\officeodt\" OfficeClientEdition="$arch" Channel="Current">
-    <Product ID="$version">
-      <Language ID="en-us" />
-      $excludeOneDrive
-    </Product>
-  </Add>
-  <Display Level="Full" AcceptEULA="TRUE" />
-  <Property Name="FORCEAPPSHUTDOWN" Value="TRUE" />
-  <Property Name="DisplayLevel" Value="Full" />
-
-</Configuration>
-"@
-    Write-Host "XML file Contents are as follows:`n$xmlContent"
-    # Output the XML to a file
-    $xmlContent | Out-File -FilePath $xmlPath -Encoding UTF8
-    
-    Start-BitsTransfer -Source $officeODTlink -Destination "C:\officeodt\officeodt.exe"
-    Write-Host "Please accept the Microsoft License Terms and choose location " -NoNewline
-    Write-Host "C:\officeodt" -ForegroundColor Yellow
-    & C:\officeodt\officeodt.exe
-    # Waiting for officeodt to finish
-    do {
-        $process = Get-Process -Name "officeodt" -ErrorAction SilentlyContinue
-        Start-Sleep -Seconds 1
-    } while ($process)
-    Start-Sleep -Seconds 1
-
-    if (Test-Path -PathType Leaf -Path C:\officeodt\setup.exe) {
-        Clear-Host
-        Write-Host "Found office setup.exe! Continuing..."
-    } else {
-        Write-Error "Did not find the setup file in the c:\officeodt folder. Please try again."
-        Write-Host "Cleaning up..."
-        Remove-Item -Recurse C:\officeodt
-        while (Test-Path C:\officeodt) {
-            Write-Host "C:\officeodt could not the removed. Trying again in 3 seconds"...
-            Remove-Item -Recurse C:\officeodt
-        }
-        return "Mission failed, we'll get them next time"
-    }
-    Write-Host "Configuring setup files..."
-    & C:\officeodt\setup.exe /download $xmlPath
-    Write-Host "Installing..."
-    & C:\officeodt\setup.exe /configure $xmlPath
-    Write-Host "Setup has finished running."
-    Write-Host "Cleaning up..."
-    Remove-Item -Recurse C:\officeodt
-    while (Test-Path C:\officeodt) {
-        Write-Host "C:\officeodt could not the removed. Trying again in 3 seconds"...
-        Remove-Item -Recurse C:\officeodt
-    }
-    Write-Host "Mission complete"
-}
 function Invoke-OfficeInstall {
-    # Architecture selection
-    while (($arch = Read-Host "Architecture? (32 or 64)") -notin @("32", "64")) {
-        Write-Host "Invalid input. Please enter 32 or 64." -ForegroundColor Red
+    function Show-MainMenu {
+        Clear-Host
+        Write-Host @"
+1. Microsoft 365 Business Standard
+2. Office 2024 Home & Business
+3. Office 2021 Home & Business
+4. Office 2019 Home & Business
+5. Office 2016 Home & Business (Oct. 14 2025 EOL)
+6. Other
+"@ -ForegroundColor DarkCyan
+        return Read-Host "Enter the office version of your choice (1-6)"
     }
 
-    # Version selection
     do {
-        Clear-Host
-        Write-Host "@
-1. Microsoft 365 Apps for Business
-2. Office 2024 Home and Business
-3. Office 2021 Home and Business
-4. Office 2019 Home and Business
-5. Other
-@" -ForegroundColor DarkCyan
-        Read-Host "Select your desired office version"
-    } while (($version) -notin 1..5) {
-        Write-Host "Invalid input. Please try again." -ForegroundColor Red
-        Start-Sleep -Seconds 2
-    }
-    if ($version -in @(5)) {
+        $versionChoice = Show-MainMenu
+    } while ($versionChoice -notin 1..6)
+
+    if ($versionChoice -eq 6) {
         $versionArray = @(
             "AccessRetail",
             "Access2019Retail",
@@ -204,41 +123,130 @@ function Invoke-OfficeInstall {
             "O365BusinessEEANoTeamsRetail",
             "O365BusinessRetail"
         )
-        # Creating a hashtable from the array
+
         $versionsHT = @{}
-        $validInputs = @()
         for ($i = 0; $i -lt $versionArray.Count; $i++) {
             $key = ($i + 1).ToString()
             $versionsHT[$key] = $versionArray[$i]
-            $validInputs += $key
         }
-        $validInputs += "exit"
-        
-        # User selection loop
-        $selectedKey = ""
-        while ($selectedKey -notin $validInputs) {
+
+        $validInputs = $versionsHT.Keys + "exit"
+        do {
             Clear-Host
             $versionsHT.GetEnumerator() | Sort-Object { [int]$_.Key } | ForEach-Object {
                 Write-Host "$($_.Key): $($_.Value)"
             }
-        
-            $selectedKey = Read-Host "Please enter a number from the list above or type 'exit' to cancel"
+            $selectedKey = Read-Host "Enter the number or type 'exit' to cancel"
             if ($selectedKey -notin $validInputs) {
                 Read-Host "Invalid input. Press Enter to try again"
             }
-        }
-        
-        if ($selectedKey -ne "exit") {
-            $version = $versionsHT[$selectedKey]
-        } else {
-            return "Exiting"
-        }
+        } while ($selectedKey -notin $validInputs)
+
+        if ($selectedKey -eq "exit") { return "Exiting..." }
+        $selectedVersion = $versionsHT[$selectedKey]
+    } else {
+        $selectedVersion = $versionChoice
     }
 
     Clear-Host
-    Install-Office $version $arch
+    Install-Office -version $selectedVersion
 }
 
+
+function Install-Office {
+    param ([string]$version)
+
+    $basePath = "C:\officeodt"
+    $xmlPath = "$basePath\officeodt-$version.xml"
+    $odtUrl = "https://download.microsoft.com/download/6c1eeb25-cf8b-41d9-8d0d-cc1dbc032140/officedeploymenttool_18623-20156.exe"
+
+    if (-not (Test-Path $basePath)) {
+        New-Item -Path $basePath -ItemType Directory | Out-Null
+        Write-Host "Created directory: $basePath"
+    }
+
+    $downloadMap = @{
+        "1" = "O365BusinessRetail"
+        "2" = "HomeBusiness2024Retail"
+        "3" = "HomeBusiness2021Retail"
+        "4" = "HomeBusiness2019Retail"
+        "5" = "HomeBusinessRetail"
+    }
+
+    if ($version -in $downloadMap.Keys) {
+        $productId = $downloadMap[$version]
+        Write-Host "Downloading and installing $productId"
+        Start-BitsTransfer -Source "https://c2rsetup.officeapps.live.com/c2r/download.aspx?ProductreleaseID=$productId&platform=x64&language=en-us&version=O16GA" -Destination "$basePath\office.exe"        
+        & "$basePath\office.exe"
+        return
+    }
+
+    # Prompt for architecture
+    do {
+        $arch = Read-Host "Architecture? (32 or 64)"
+    } while ($arch -notin @("32", "64"))
+
+    # Exclude OneDrive?
+    $excludeOneDrive = ""
+    $excludeResponse = Read-Host "Would you like to exclude OneDrive? (Y/n)"
+    if ($excludeResponse -notin @("n", "N", "no")) {
+        $excludeOneDrive = '<ExcludeApp ID="OneDrive" />'
+    }
+
+    $xmlContent = @"
+<Configuration>
+    <Add SourcePath="$basePath\" OfficeClientEdition="$arch" Channel="Current">
+        <Product ID="$version">
+            <Language ID="en-us" />
+            $excludeOneDrive
+        </Product>
+    </Add>
+    <Display Level="Full" AcceptEULA="TRUE" />
+    <Property Name="FORCEAPPSHUTDOWN" Value="TRUE" />
+    <Property Name="DisplayLevel" Value="Full" />
+</Configuration>
+"@
+
+    $xmlContent | Out-File -FilePath $xmlPath -Encoding UTF8
+
+    Start-BitsTransfer -Source $odtUrl -Destination "$basePath\officeodt.exe"
+    Write-Host "Please accept the Microsoft License Terms and choose location" -NoNewline
+    Write-Host " $basePath" -ForegroundColor Yellow
+    & "$basePath\officeodt.exe"
+
+    # Wait for setup
+    do {
+        $process = Get-Process -Name "officeodt" -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 1
+    } while ($process)
+
+    if (-not (Test-Path "$basePath\setup.exe")) {
+        Write-Error "setup.exe not found in $basePath"
+        Invoke-OfficeCleanUp
+        return "Mission failed"
+    }
+
+    Write-Host "Downloading Office installer files..."
+    & "$basePath\setup.exe" /download $xmlPath
+
+    Write-Host "Installing Office..."
+    & "$basePath\setup.exe" /configure $xmlPath
+
+    Write-Host "Installation complete."
+    Invoke-OfficeCleanUp
+    Write-Host "Mission complete"
+}
+
+function Invoke-OfficeCleanUp {
+    $path = "C:\officeodt"
+    Write-Host "Cleaning up..."
+    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $path
+    while (Test-Path $path) {
+        Write-Host "Retrying removal of $path..."
+        Start-Sleep -Seconds 3
+        Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $path
+    }
+}
 Function Invoke-ReleaseRenew {
     Write-Host "Releasing and Renewing IP Address..." -ForegroundColor Magenta
     ipconfig /release
@@ -354,7 +362,7 @@ Function Get-CppRedist {
 }
 # Run Advanced IP Scanner
 Function Get-IPScanner {
-    $zipUrl = "https://github.com/treyob/lib/releases/download/v0.2/ipscanner.zip"
+    $zipUrl = "https://obtoolbox-public.s3.us-east-2.amazonaws.com/3rd-party-tools/ipscanner.zip"
     $targetDir = "C:\ipscanner"
     Clear-Host; Write-Host "Downloading Advanced IP Scanner"
     Start-BitsTransfer -Source $zipUrl -Destination "$env:TEMP\obsoftware\ipscanner.zip"
@@ -369,8 +377,6 @@ Function Get-IPScanner {
     } while ($process)
     Remove-Item -Recurse -Force $targetDir, "$env:TEMP\obsoftware\ipscanner.zip"
 }
-
-
 # This function can determine the state of Bitlocker
 Function Get-BitlockerStatus {
     # Get Protection Status
@@ -674,25 +680,40 @@ Function Invoke-WizTree {
 Function Invoke-HWInfo {
     $zipUrl = "https://cytranet-dal.dl.sourceforge.net/project/hwinfo/Windows_Portable/hwi_820.zip?viasf=1"
     $targetDir = "C:\HWInfo"
+    
     Clear-Host; Write-Host "Downloading hwinfo"
     Invoke-WebRequest -Uri $zipUrl -OutFile "$env:TEMP\hwinfo.zip"
+    
     Clear-Host; Write-Host "Extracting hwinfo"
-    New-Item -ItemType Directory $targetDir
-    Expand-Archive -Path "$env:TEMP\hwinfo.zip" -DestinationPath $targetDir
-    Invoke-WebRequest -Uri https://github.com/treyob/lib/releases/download/v0.2/HWiNFO64.INI -OutFile "$targetDir\HWiNFO64.INI"
+    New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
+    Expand-Archive -Path "$env:TEMP\hwinfo.zip" -DestinationPath $targetDir -Force
+
+    # Create the INI file directly
+    $iniContent = @"
+[Settings]
+SummaryOnly=1
+Theme=1
+AutoUpdateBetaDisable=1
+AutoUpdate=0
+"@
+    Set-Content -Path "$targetDir\HWiNFO64.INI" -Value $iniContent -Encoding ASCII
+
     Clear-Host; Write-Host "Running hwinfo."
     Start-Process -FilePath "$targetDir\hwinfo64.exe" -Verb RunAs
+    
     Clear-Host; Invoke-PounceCat "hwinfo should now be running." "This screen will exit when you close hwinfo."
+    
     do {
         $process = Get-Process -Name "hwinfo64" -ErrorAction SilentlyContinue
         Start-Sleep -Seconds 1
     } while ($process)
+    
     Remove-Item -Recurse -Force $targetDir, "$env:TEMP\hwinfo.zip"
 }
 
 # Dot Net Repair Tool
 Function Invoke-DotNetRepair {
-    $installUrl = "https://github.com/treyob/lib/releases/download/v0.2/NetFxRepairTool.exe"
+    $installUrl = "https://obtoolbox-public.s3.us-east-2.amazonaws.com/3rd-party-tools/NetFxRepairTool.exe"
     $targetDir = "C:\DotNetRepair"
     Clear-Host; Write-Host "Installing and Starting .Net Repair Tool"
     if (-Not (Test-Path -Path $targetDir)) {New-Item -ItemType Directory -Path $targetDir -Force | Out-Null}
@@ -707,7 +728,7 @@ Function Invoke-DotNetRepair {
     Remove-Item -Recurse -Force $targetDir
 }
 Function Invoke-TDOXDRW11Fix {
-    $installUrl = "https://github.com/treyob/lib/releases/download/v0.2/TDOXDRWin11Fix.exe"
+    $installUrl = "https://obtoolbox-public.s3.us-east-2.amazonaws.com/3rd-party-tools/TDOXDRWin11Fix.exe"
     $targetDir = "C:\TDOXDRWin11Fix"
     Clear-Host; Write-Host "Installing and Starting .Net Repair Tool"
     if (-Not (Test-Path -Path $targetDir)) {New-Item -ItemType Directory -Path $targetDir -Force | Out-Null}
@@ -838,23 +859,6 @@ Function Invoke-RevoUninstaller {
     Remove-Item -Recurse -Force $targetDir, "$env:TEMP\obsoftware\RevoUninstaller.zip"
 }
 
-#Function Start-HoldMusic {
-#    param ()
-#    if (-Not (Test-Path -Path "$env:temp\obsoftware\hold.wav")) {
-#        Write-Host "Downloading hold music"
-#        Start-BitsTransfer -Source "https://github.com/treyob/lib/releases/download/v0.2/opus.no.1.wav" -Destination "$env:temp\obsoftware\hold.wav" > $null
-#    }
-#    $global:sound = New-Object System.Media.SoundPlayer "$env:temp\obsoftware\hold.wav"
-#    $global:sound.PlayLooping()
-#}
-#
-#Function Stop-HoldMusic {
-#    if ($global:sound -ne $null) {
-#        $global:sound.Stop()
-#        $global:sound.Dispose()
-#        $global:sound = $null
-#    }
-#}
 Function Start-HoldMusic {
     param (
         [string]$link,
@@ -884,15 +888,476 @@ function Invoke-HoldMusicSection {
         $holdMusicTable = @(
             [PSCustomObject]@{ Option = '1. Other'; Song = 'Opus No. 1 - Tim Carleton'}
             [PSCustomObject]@{ Option = '2. Dexis'; Song = '12 Spanish Dances in G Major Arr. for Guitar'}
-            [PSCustomObject]@{ Option = '3. Stop Music'}
+            [PSCustomObject]@{ Option = '3. Comcast'; Song = 'Winelight - Grover Washington'}
+            [PSCustomObject]@{ Option = '4. Stop Music'}
         )
         $holdMusicTable | Format-Table -AutoSize
 
         switch ($musicChoice) {
-            "1" { Start-HoldMusic -link 'https://github.com/treyob/lib/releases/download/v0.2/opus.no.1.wav' -songName 'Opus No. 1 - Tim Carleton' }
-            "2" { Start-HoldMusic -link 'https://github.com/treyob/lib/releases/download/v0.2/12.span.dance.wav' -songName '12 Spanish Dances in G Major Arr. for Guitar' }
-            "3" { Stop-HoldMusic }
+            "1" { Start-HoldMusic -link 'https://obtoolbox-public.s3.us-east-2.amazonaws.com/hold-music/opus.no.1.wav' -songName 'Opus No. 1 - Tim Carleton' }
+            "2" { Start-HoldMusic -link 'https://obtoolbox-public.s3.us-east-2.amazonaws.com/hold-music/12.span.dance.wav' -songName '12 Spanish Dances in G Major Arr. for Guitar' }
+            "3" { Start-HoldMusic -link 'https://obtoolbox-public.s3.us-east-2.amazonaws.com/hold-music/Winelight+(152kbit_Opus).wav' -songName 'Winelight - Grover Washington' }
+            "4" { Stop-HoldMusic }
         }
         $musicChoice = Read-Host "Enter the number of your choice, or press enter to exit"
     } while ($musicChoice -ne "")
 }
+
+Function Open-ExternalLink {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$Url
+    )
+    # Open with default browser associated with URLs using multiple fallbacks
+    try {
+        [System.Diagnostics.Process]::Start($Url) | Out-Null
+    } catch {
+        try {
+            Start-Process -FilePath $Url -ErrorAction Stop
+        } catch {
+            Start-Process "cmd.exe" -ArgumentList "/c start `""" + $Url + "`""" -WindowStyle Hidden
+        }
+    }
+}
+
+
+### Start Sidexis Migration Functions
+Function Set-SidexisServerPath {
+    clear-host
+    # Prompt user for new network share path
+    $newPath = Read-Host "Enter the new Deployment Share path (e.g. \\SERVER02\PDATA)"
+
+    # Validate format (basic check for UNC path)
+    if ($newPath -notmatch "^\\\\[^\\]+\\[^\\]+") {
+        Write-Host "Invalid path format. Please use a UNC path like \\SERVER02\PDATA." -ForegroundColor Red
+        return
+    }
+
+    # Test network path accessibility
+    Write-Host "Checking if the path is reachable..."
+    if (!(Test-Path $newPath)) {
+        Write-Host "The path '$newPath' is not reachable. Please check the network or path." -ForegroundColor Red
+        return
+    }
+
+    # Set registry path
+    $regPath = "HKLM:\SOFTWARE\Sirona\SIDEXIS4\Provisioning"
+
+    # Check if key exists
+    if (!(Test-Path $regPath)) {
+        Write-Host "Registry path not found: $regPath" -ForegroundColor Red
+        return
+    }
+
+    # Update registry key
+    try {
+        Set-ItemProperty -Path $regPath -Name "DeploymentShare" -Value $newPath
+        Write-Host "DeploymentShare updated successfully to '$newPath'." -ForegroundColor Green
+    } catch {
+        Write-Host "Failed to update registry: $_" -ForegroundColor Red
+        return
+    }
+}
+Function Install-SSMS {
+    param()
+    $ssmsUrl = "https://aka.ms/ssmsfullsetup"
+    $installerPath = "$env:TEMP\SSMS-Setup.exe"
+    Write-Host "Installing SQL Server Management Studio"
+    Start-BitsTransfer -Source $ssmsUrl -Destination $installerPath
+    Start-Process -FilePath $installerPath -ArgumentList "/install", "/quiet", "/norestart" -Wait
+    Remove-Item $installerPath
+    Write-Output "SSMS installation complete."
+}
+Function Invoke-CheckSidexisSQLInstances {
+    param()
+    $instanceName = "SIDEXIS_SQL"
+    $instanceExists = Get-Service | Where-Object { $_.DisplayName -like "*$instanceName*" }
+
+    if ($instanceExists) {
+        Write-Warning "SQL Instance '$instanceName' already exists."
+        $response = (Write-Host @"
+Either press ENTER, uninstall SIDEXIS_SQL, and run script again, or type "SKIP" to skip this part of the script. 
+Uninstall by going to:
+Control Panel > Uninstall Programs > Double Click 'Microsoft SQL Server 2017' > In 'instance to remove', choose 'SIDEXIS_SQL'?
+
+"@)
+        if ($response -eq 'SKIP') {
+            # Uninstall SQL instance is not automated yet
+        } else {
+            Write-Output "Aborting installation."
+            exit
+        }
+    } else {
+        Write-Host "Verified no other SidexisSQL instance exists."
+    }
+}
+Function Install-SIDEXIS_SQL {
+    $installDir = "C:\SQL2017"
+    $bootstrapper = "$installDir\SQLServer2017-SSEI-Expr.exe"
+    $mediaDir = "$installDir\Media"
+    $iniFile = "$installDir\ConfigurationFile.ini"
+    $extractPath = "$mediaDir\Extracted"
+    $instanceName = "SIDEXIS_SQL"
+    $serviceName = "MSSQL`$$instanceName"
+
+    if (-not (Test-Path $installDir)) { New-Item -ItemType Directory -Path $installDir -Force | Out-Null }
+
+    if (-not (Test-Path $bootstrapper)) {
+        Write-Host "Downloading bootstrapper..."
+        Start-BitsTransfer -Source "https://download.microsoft.com/download/5/e/9/5e9b18cc-8fd5-467e-b5bf-bade39c51f73/SQLServer2017-SSEI-Expr.exe" -Destination $bootstrapper
+    }
+
+    if (-not (Test-Path "$mediaDir\SQLEXPR_x64_ENU.exe")) {
+        Write-Host "Downloading full media..."
+        New-Item -Path $mediaDir -ItemType Directory -Force | Out-Null
+        Start-Process -FilePath $bootstrapper -ArgumentList "/Action=Download /Quiet /MediaPath=`"$mediaDir`" /MediaType=Core" -Wait
+    }
+
+    @"
+[OPTIONS]
+ACTION="Install"
+ROLE="AllFeatures_WithDefaults"
+ENU="True"
+QUIETSIMPLE="True"
+UpdateEnabled="False"
+USEMICROSOFTUPDATE="False"
+FEATURES=SQLENGINE,REPLICATION,SNAC_SDK
+INSTANCENAME="$instanceName"
+INSTANCEID="$instanceName"
+INSTALLSHAREDDIR="C:\Program Files\Microsoft SQL Server"
+INSTALLSHAREDWOWDIR="C:\Program Files (x86)\Microsoft SQL Server"
+INSTANCEDIR="C:\Program Files\Microsoft SQL Server"
+
+SQLSVCACCOUNT="NT Service\MSSQL`$$instanceName"
+SQLSVCSTARTUPTYPE="Automatic"
+SQLSVCINSTANTFILEINIT="False"
+
+AGTSVCACCOUNT="NT AUTHORITY\NETWORK SERVICE"
+AGTSVCSTARTUPTYPE="Disabled"
+
+SQLTELSVCACCT="NT Service\SQLTELEMETRY`$$instanceName"
+SQLTELSVCSTARTUPTYPE="Automatic"
+
+SECURITYMODE="SQL"
+SAPWD="2BeChanged!"
+
+ADDCURRENTUSERASSQLADMIN="True"
+
+TCPENABLED="1"
+NPENABLED="1"
+BROWSERSVCSTARTUPTYPE="Automatic"
+
+SQLCOLLATION="SQL_Latin1_General_CP1_CI_AS"
+ENABLERANU="True"
+
+SQLTEMPDBFILECOUNT="1"
+SQLTEMPDBFILESIZE="8"
+SQLTEMPDBFILEGROWTH="64"
+SQLTEMPDBLOGFILESIZE="8"
+SQLTEMPDBLOGFILEGROWTH="64"
+
+IACCEPTSQLSERVERLICENSETERMS="True"
+"@ | Set-Content -Path $iniFile -Encoding ASCII
+
+    New-Item -Path $extractPath -ItemType Directory -Force | Out-Null
+    Write-Host "Extracting setup files silently..."
+    & "$mediaDir\SQLEXPR_x64_ENU.exe" /Q /IACCEPTSQLSERVERLICENSETERMS /ENU /X:"$extractPath"
+
+    $setupExe = Join-Path $extractPath "SETUP.EXE"
+    $timeout = 30
+    $elapsed = 0
+    while (-not (Test-Path $setupExe) -and $elapsed -lt $timeout) {
+        Start-Sleep -Seconds 1
+        $elapsed++
+    }
+
+    if (Test-Path $setupExe) {
+        Write-Host "Running silent install..."
+        & $setupExe /ConfigurationFile="$iniFile"
+
+        # Wait a bit for service registration
+        Start-Sleep -Seconds 10
+
+        # Try starting the service
+        $sqlServiceName = "MSSQL`$$instanceName"
+        Write-Host "Checking SQL Server service: $sqlServiceName"
+        $service = Get-Service -Name $sqlServiceName -ErrorAction SilentlyContinue
+
+        if ($service -and $service.Status -ne 'Running') {
+            try {
+                Start-Service -Name $sqlServiceName -ErrorAction Stop
+                Start-Sleep -Seconds 5
+            } catch {
+                Write-Warning "SQL Service failed to start. Attempting rebuild..."
+
+                # Run RebuildDatabase
+                C:\SQL2017\Media\Extracted\setup.exe /QUIET /ACTION=REBUILDDATABASE /INSTANCENAME=SIDEXIS_SQL /SQLSYSADMINACCOUNTS="BUILTIN\Administrators" /SAPWD="2BeChanged!" /IACCEPTSQLSERVERLICENSETERMS
+
+                # Try starting again
+                Start-Sleep -Seconds 5
+                try {
+                    Start-Service -Name $sqlServiceName
+                    Write-Host "Service started after rebuild."
+                } catch {
+                    Write-Error "Rebuild failed or service could not be started."
+                }
+            }
+        } elseif ($service -and $service.Status -eq 'Running') {
+            Write-Host "SQL Server instance '$instanceName' is running."
+        } else {
+            Write-Error "Service $sqlServiceName not found."
+        }
+    } else {
+        Write-Error "SETUP.EXE not found after waiting $timeout seconds. Install aborted."
+    }
+    Remove-Item -Recurse "C:\SQL2017"
+}
+function Get-LatestDBBackups {
+    param (
+        [Parameter(Mandatory=$true)]
+        [string]$dbBackupDir
+    )
+
+    # Ensure the directory exists
+    if (-Not (Test-Path $dbBackupDir)) {
+        Write-Error "Directory '$dbBackupDir' does not exist."
+        return
+    }
+
+    # Get all .bak files in the directory
+    $bakFiles = Get-ChildItem -Path $dbBackupDir -Filter *.bak -File
+
+    # Get latest PDATA_SQLEXPRESS.bak
+    $latestPdataBak = $bakFiles |
+        Where-Object { $_.Name -like '*_PDATA_SQLEXPRESS.bak' } |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1
+
+    # Get latest SIDEXIS.bak
+    $latestSidexisBak = $bakFiles |
+        Where-Object { $_.Name -like '*_SIDEXIS.bak' } |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1
+
+    # Output results
+    if ($latestPdataBak) {
+        Write-Output "Latest PDATA_SQLEXPRESS.bak: $($latestPdataBak.Name) - Last Modified: $($latestPdataBak.LastWriteTime)"
+    } else {
+        Write-Warning "No PDATA_SQLEXPRESS.bak files found."
+    }
+
+    if ($latestSidexisBak) {
+        Write-Output "Latest SIDEXIS.bak: $($latestSidexisBak.Name) - Last Modified: $($latestSidexisBak.LastWriteTime)"
+    } else {
+        Write-Warning "No SIDEXIS.bak files found."
+    }
+
+    # Return as output variables
+    return @{
+        PDATA_SQLEXPRESS = $latestPdataBak
+        SIDEXIS = $latestSidexisBak
+    }
+}
+function Find-SqlCmd {
+    Write-Host "Searching for sqlcmd.exe..."
+    $paths = @(
+        "$env:ProgramFiles\Microsoft SQL Server",
+        "$env:ProgramFiles(x86)\Microsoft SQL Server",
+        "$env:ProgramW6432\Microsoft SQL Server"
+    )
+
+    foreach ($base in $paths) {
+        try {
+            $result = Get-ChildItem -Path $base -Recurse -Filter sqlcmd.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($result) {
+                Write-Host "Found sqlcmd at: $($result.FullName)"
+                return $result.FullName
+            }
+        } catch {}
+    }
+
+    Write-Warning "sqlcmd.exe not found. Manual restore required."
+    return $null
+}
+Function Restore-DBBackups {
+
+    function Get-LogicalFileNames {
+        param (
+            [string]$sqlcmdPath,
+            [string]$sqlInstance,
+            [string]$sqlUser,
+            [string]$sqlPassword,
+            [string]$bakPath
+        )
+
+        $query = "RESTORE FILELISTONLY FROM DISK = N'$bakPath';"
+        $output = & "$sqlcmdPath" -S $sqlInstance -U $sqlUser -P $sqlPassword -Q $query -W -s"," 2>$null
+
+        if (-not $output -or $output.Count -lt 2) {
+            throw "Failed to retrieve logical file names from $bakPath"
+        }
+
+        $lines = $output | Where-Object { $_ -and ($_ -notmatch "^-+") }
+        $data = ($lines[1] -split ',')[0].Trim('"')
+        $log = ($lines[2] -split ',')[0].Trim('"')
+        return @{ Data = $data; Log = $log }
+    }
+
+    function Restore-Database {
+        param (
+            [string]$dbName,
+            [string]$bakPath
+        )
+
+        Write-Host "`nRestoring $dbName from $bakPath..."
+
+        $sqlcmdPath = Find-SqlCmd
+        if (-not $sqlcmdPath) {
+            Write-Error "ERROR: sqlcmd.exe not found. Please restore '$dbName' manually using SSMS or T-SQL."
+            return
+        }
+
+        $sqlInstance = "localhost\SIDEXIS_SQL"
+        $sqlUser = "sa"
+        $sqlPassword = "2BeChanged!"
+
+        try {
+            $logical = Get-LogicalFileNames -sqlcmdPath $sqlcmdPath -sqlInstance $sqlInstance -sqlUser $sqlUser -sqlPassword $sqlPassword -bakPath $bakPath
+
+            $mdfPath = "C:\Program Files\Microsoft SQL Server\MSSQL14.SIDEXIS_SQL\MSSQL\DATA\$dbName.mdf"
+            $ldfPath = "C:\Program Files\Microsoft SQL Server\MSSQL14.SIDEXIS_SQL\MSSQL\DATA\${dbName}_log.ldf"
+
+            $restoreQuery = @"
+USE [master];
+IF DB_ID('$dbName') IS NOT NULL
+BEGIN
+    ALTER DATABASE [$dbName] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+    DROP DATABASE [$dbName];
+END
+RESTORE DATABASE [$dbName]
+FROM DISK = N'$bakPath'
+WITH MOVE N'$($logical.Data)' TO N'$mdfPath',
+    MOVE N'$($logical.Log)' TO N'$ldfPath',
+    REPLACE;
+"@
+
+            $tempSqlFile = New-TemporaryFile
+            Set-Content -Path $tempSqlFile.FullName -Value $restoreQuery -Encoding UTF8
+
+            & "$sqlcmdPath" -S $sqlInstance -U $sqlUser -P $sqlPassword -i $tempSqlFile.FullName
+            if ($LASTEXITCODE -ne 0) {
+                throw "sqlcmd returned exit code $LASTEXITCODE"
+            }
+
+            Write-Host "$dbName restored successfully."
+        } catch {
+            Write-Error "❌ Failed to restore $dbName. Please restore it manually. Details: $_"
+        } finally {
+            if ($tempSqlFile) { Remove-Item $tempSqlFile.FullName -Force -ErrorAction SilentlyContinue }
+        }
+    }
+
+    # === Begin Script ===
+
+    $backupDir = "G:\PDATA\Backup"
+    Write-Host "Backup directory set to: $backupDir"
+
+    $PDATA_SQLEXPRESS = Get-ChildItem -Path $backupDir -Filter "*_PDATA_SQLEXPRESS.bak" | Select-Object -First 1
+    $SIDEXIS = Get-ChildItem -Path $backupDir -Filter "*_SIDEXIS.bak" | Select-Object -First 1
+
+    Write-Host "Path 1: $($SIDEXIS.FullName)"
+    Write-Host "Path 2: $($PDATA_SQLEXPRESS.FullName)"
+
+    if ($PDATA_SQLEXPRESS) {
+        Restore-Database -dbName "PDATA" -bakPath $($PDATA_SQLEXPRESS.FullName)
+    } else {
+        Write-Warning "❌ Could not find a PDATA_SQLEXPRESS .bak file."
+    }
+
+    if ($SIDEXIS) {
+        Restore-Database -dbName "SIDEXIS" -bakPath $($SIDEXIS.FullName)
+    } else {
+        Write-Warning "❌ Could not find a SIDEXIS .bak file."
+    }
+}
+function Remove-ProvisioningJobTargetType0 {
+    param(
+        [string]$sqlInstance,
+        [string]$sqlUser,
+        [string]$sqlPassword,
+        [string]$database = "SIDEXIS"
+    )
+
+    $sqlcmdPath = Find-SqlCmd
+    if (-not $sqlcmdPath) {
+        Write-Error "sqlcmd.exe not found on this machine. Please install SQL Server Command Line Utilities."
+        return
+    }
+
+    # Create temp SQL file to delete the row with TargetType = 0
+    $sql = @"
+USE [$database];
+DELETE FROM dbo.ProvisioningJob WHERE TargetType = 0;
+GO
+"@
+
+    $tempSqlFile = [System.IO.Path]::GetTempFileName() + ".sql"
+    Set-Content -Path $tempSqlFile -Value $sql -Encoding UTF8
+
+    try {
+        # Run sqlcmd with provided credentials
+        $args = @(
+            "-S", $sqlInstance,
+            "-U", $sqlUser,
+            "-P", $sqlPassword,
+            "-i", $tempSqlFile
+        )
+        $process = Start-Process -FilePath $sqlcmdPath -ArgumentList $args -NoNewWindow -Wait -PassThru
+
+        if ($process.ExitCode -eq 0) {
+            Write-Host "Row(s) with TargetType=0 deleted from dbo.ProvisioningJob successfully."
+        } else {
+            Write-Error "Failed to delete row from dbo.ProvisioningJob. Exit code: $($process.ExitCode)"
+        }
+    } catch {
+        Write-Error "Error running sqlcmd: $_"
+    } finally {
+        Remove-Item -Path $tempSqlFile -ErrorAction SilentlyContinue
+    }
+}
+Function Open-SidexisMigrationSection {
+    do {
+        Clear-Host
+        Write-Warning "For production, do not use on Windows Server 2025. SQL 2017 is not officially compatible"
+        Write-Host "Sidexis Database Migration`n" -ForegroundColor DarkCyan
+        Write-Host "Scripts (Est. 20-45 min)" -ForegroundColor DarkYellow
+        Write-Host @"
+1. Sql Server Management Software Installer              _._     _,-'""```-._
+2. SIDEXIS_SQL Installer                               (,-.```._,'(       |\```-/| 
+3. Restore from DB Backup and configure tool                ```-.-' \ )-```( , o o)
+4. Manually Install Sidexis Server                                 ```-    \```_`"'-"
+5. Provision each workstation to use the new PDATA share (Run on each workstation)
+
+"@
+    Write-Host "For Aquisition Server and IO Software:" -ForegroundColor DarkYellow                                                
+    Write-Host @" 
+7. Sidexis Migration Documentation
+
+"@                                               
+    Write-Host @" 
+00. Exit Sidexis Database Migration        
+"@
+$dentalChoice = Read-Host "Enter the number of your choice"
+    
+
+        switch ($dentalChoice) {
+            "1"  { Start-Process powershell.exe -ArgumentList "-NoProfile -Command & {Import-Module '$env:TEMP\obsoftware\ob.psm1'; Install-SSMS}" -Verb RunAs }
+            "2"  { Start-Process powershell.exe -ArgumentList "-NoProfile -Command & {Import-Module '$env:TEMP\obsoftware\ob.psm1'; Install-SIDEXIS_SQL}" -Verb RunAs }
+            "3"  { Start-Process powershell.exe -ArgumentList "-NoProfile -Command & {Import-Module '$env:TEMP\obsoftware\ob.psm1'; Restore-DBBackups; Remove-ProvisioningJobTargetType0 -sqlInstance 'localhost\SIDEXIS_SQL' -sqlUser 'sa' -sqlPassword '2BeChanged!'; pause}" -Verb RunAs }
+            "5"  { Set-SidexisServerPath; Read-Host "Press enter to dismiss"}
+            "7"  { Open-ExternalLink "https://www.dentsplysironasupport.com/content/dam/master/product-procedure-brand-categories/imaging/product-categories/software/imaging-software/sidexis-4/Sidexis%204%20Migration%20Guide%20Rev.2.pdf"}
+        }
+    } while ($dentalChoice -ne "00")
+}
+
+### End Sidexis Migration Functions
