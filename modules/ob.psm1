@@ -11,8 +11,10 @@ function Install-Office {
     }
     # Define your variables
     switch ($version) {
-        "365B" { $version = "O365ProPlusRetail" }
-        "2016" { $version = "ProPlus2016Retail"}
+        "4" { $version = "HomeBusiness2019Retail"}
+        "3" { $version = "HomeBusiness2021Retail" }
+        "2" { $version = "HomeBusiness2024Retail" }
+        "1" { $version = "O365ProPlusRetail" }
     }
     if ((Read-Host "Would you like to exclude OneDrive? (Y/n)") -notin @("n","N","no")) {
         $excludeOneDrive = '<ExcludeApp ID="OneDrive" />'
@@ -81,10 +83,21 @@ function Invoke-OfficeInstall {
     }
 
     # Version selection
-    while (($version = Read-Host "Office version? (2016 or 365B or other)") -notin @("2016", "365B","other")) {
-        Write-Host "Invalid input. Please enter 2016 or 365B." -ForegroundColor Red
+    do {
+        Clear-Host
+        Write-Host "@
+1. Microsoft 365 Apps for Business
+2. Office 2024 Home and Business
+3. Office 2021 Home and Business
+4. Office 2019 Home and Business
+5. Other
+@" -ForegroundColor DarkCyan
+        Read-Host "Select your desired office version"
+    } while (($version) -notin 1..5) {
+        Write-Host "Invalid input. Please try again." -ForegroundColor Red
+        Start-Sleep -Seconds 2
     }
-    if ($version -in @("other")) {
+    if ($version -in @(5)) {
         $versionArray = @(
             "AccessRetail",
             "Access2019Retail",
