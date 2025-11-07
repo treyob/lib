@@ -144,7 +144,8 @@ function Invoke-OfficeInstall {
 
         if ($selectedKey -eq "exit") { return "Exiting..." }
         $selectedVersion = $versionsHT[$selectedKey]
-    } else {
+    }
+    else {
         $selectedVersion = $versionChoice
     }
 
@@ -332,7 +333,7 @@ Function Enable-RDP {
 # Allow all Windows Defender Firewall
 Function Unlock-FirewallAll {
     Write-Host "Setting Firewall Profiles to Allow" -ForegroundColor Magenta
-    Set-NetFirewallProfile -Profile Domain,Private,Public -DefaultInboundAction Allow
+    Set-NetFirewallProfile -Profile Domain, Private, Public -DefaultInboundAction Allow
     Write-Host "Firewall configuration completed successfully. Press Enter to continue." -ForegroundColor Magenta
     Read-Host
 }
@@ -384,9 +385,11 @@ Function Get-BitlockerStatus {
     
     if ($protectionOn -match "Protection Status:\s*Protection On") {
         $protectionOn = $true
-    } elseif ($protectionOn -match "Protection Status:\s*Protection Off \(1 reboots left\)") {
+    }
+    elseif ($protectionOn -match "Protection Status:\s*Protection Off \(1 reboots left\)") {
         $protectionOn = "suspendreboot"
-    } elseif ($protectionOn -match "Protection Status:\s*Protection Off") {
+    }
+    elseif ($protectionOn -match "Protection Status:\s*Protection Off") {
         $protectionOn = $false
     }
 
@@ -394,7 +397,8 @@ Function Get-BitlockerStatus {
     $fullyEncrypted = manage-bde -status C: | Select-String "Percent Encrypted"
     if ($fullyEncrypted -match "Percent Encrypted:\s* 100%\s*") {
         $fullyEncrypted = $true
-    } else {
+    }
+    else {
         $fullyEncrypted = $false
     }
 
@@ -402,20 +406,25 @@ Function Get-BitlockerStatus {
     $encryptionEnabled = manage-bde -status C: | Select-String "Encryption Method"
     if ($encryptionEnabled -notmatch "\s*Encryption Method:\s*None\s*") {
         $encryptionEnabled = $true
-    } else {
+    }
+    else {
         $encryptionEnabled = $false
     }
 
     # Determine BitLocker Status
     if ($protectionOn -eq $true -and $encryptionEnabled) {
         $bitlockerStatus = "protected"
-    } elseif ($protectionOn -eq $false -and $encryptionEnabled) {
+    }
+    elseif ($protectionOn -eq $false -and $encryptionEnabled) {
         $bitlockerStatus = "suspended"
-    } elseif ($protectionOn -eq "suspendreboot") {
+    }
+    elseif ($protectionOn -eq "suspendreboot") {
         $bitlockerStatus = "suspendreboot"
-    } elseif ($fullyEncrypted -eq $false -and $protectionOn -eq $false -and $encryptionEnabled -eq $false) {
+    }
+    elseif ($fullyEncrypted -eq $false -and $protectionOn -eq $false -and $encryptionEnabled -eq $false) {
         $bitlockerStatus = "disabled"
-    } else {
+    }
+    else {
         $bitlockerStatus = "unexpected"
         Write-Host "BitLocker is in an unexpected state. See below"
         manage-bde -status C:
@@ -428,52 +437,60 @@ Function Set-BitLockerState {
     param (
         [string]$action
     )
-    if ($bitlockerStatus -in @("suspended","suspendreboot","disabled") -and $action -in @("Shutdown", "Reboot")) {
+    if ($bitlockerStatus -in @("suspended", "suspendreboot", "disabled") -and $action -in @("Shutdown", "Reboot")) {
         Write-Host "BitLocker is suspended, proceeding with $action." -ForegroundColor Green
         $cmd = if ($action -eq "Shutdown") { shutdown /s /t 0 /c '$action by OverBytesTech script' /f /d p:4:1 } else { shutdown /r /t 0 /c "$action by OverBytesTech script" /f /d p:4:1 }
         $cmd
         Write-Host "Server will now $action." -ForegroundColor Yellow
         exit
-    } elseif ($action -eq "Suspend") {
+    }
+    elseif ($action -eq "Suspend") {
         $bitlockerStatus = Get-BitlockerStatus
-        if ($bitlockerStatus -eq "suspendreboot") {Write-Host "Resuming first"; Resume-BitLocker -MountPoint "C:"}
+        if ($bitlockerStatus -eq "suspendreboot") { Write-Host "Resuming first"; Resume-BitLocker -MountPoint "C:" }
         Write-Host "Suspending BitLocker for C: until manually enabled."
         Suspend-BitLocker -MountPoint "C:" -RebootCount 0
         $bitlockerStatus = Get-BitlockerStatus
         if ($bitlockerStatus -eq "suspended") {
             Write-Host "BitLocker successfully suspended for C:." -ForegroundColor Green
-        } else {
+        }
+        else {
             Write-Host "Bitlocker Suspend Failed!" -ForegroundColor Red
         }
         Read-Host "Press Enter to dismiss"
-    } elseif ($action -eq "SuspendReboot") {
+    }
+    elseif ($action -eq "SuspendReboot") {
         $bitlockerStatus = Get-BitlockerStatus
-        if ($bitlockerStatus -eq "suspended") {Write-Host "Resuming first"; Resume-BitLocker -MountPoint "C:"}
+        if ($bitlockerStatus -eq "suspended") { Write-Host "Resuming first"; Resume-BitLocker -MountPoint "C:" }
         Write-Host "Suspending BitLocker for C: for 1 reboot."
         Suspend-BitLocker -MountPoint "C:" -RebootCount 1
         $bitlockerStatus = Get-BitlockerStatus
         if ($bitlockerStatus -eq "suspendreboot") {
             Write-Host "BitLocker successfully suspended for C:." -ForegroundColor Green
-        } else {
-            Write-Host "Bitlocker Suspend Failed!`nBitlockerStatus:" -ForegroundColor Red;Get-BitlockerStatus
+        }
+        else {
+            Write-Host "Bitlocker Suspend Failed!`nBitlockerStatus:" -ForegroundColor Red; Get-BitlockerStatus
         }
         Read-Host "Press Enter to dismiss"
-    } elseif ($action -eq "Resume") {
+    }
+    elseif ($action -eq "Resume") {
         Write-Host "Resuming BitLocker for C:."
         Resume-BitLocker -MountPoint "C:"
         $bitlockerStatus = Get-BitlockerStatus
         if ($bitlockerStatus -eq "protected") {
             Write-Host "BitLocker successfully resumed for C:." -ForegroundColor Green
-        } else {
+        }
+        else {
             Write-Host "Failed to resume BitLocker for C:.`nBitlockerStatus: $bitlockerStatus" -ForegroundColor Red
         }
         Read-Host "Press Enter to dismiss"
-    } elseif ($action -eq "Status") {
+    }
+    elseif ($action -eq "Status") {
         $bitlockerStatus = Get-BitlockerStatus
         Write-Host = "Status variable: $bitlockerStatus`n`n"
         manage-bde -status C:
         Read-Host "Press Enter to dismiss"
-    } else {
+    }
+    else {
         Write-Host "BitLocker is not suspended. Cannot proceed with $action." -ForegroundColor Red
         Read-Host "Press Enter to dismiss"
     }
@@ -488,7 +505,8 @@ Function Set-AdobeSettings {
         try {
             $securityIdentifier = New-Object System.Security.Principal.SecurityIdentifier($sid)
             $account = $securityIdentifier.Translate([System.Security.Principal.NTAccount])
-        } catch {
+        }
+        catch {
             Write-Warning "Could not resolve SID: $sid"
         }
         return $account.Value
@@ -501,21 +519,21 @@ Function Set-AdobeSettings {
             Write-Host "Created registry path: $path" -ForegroundColor Yellow
         }
         # Check if the key exists, if not, create the key
-        if ($null -eq (Get-ItemProperty -Path $path -Name $key -ErrorAction SilentlyContinue))
-        {
+        if ($null -eq (Get-ItemProperty -Path $path -Name $key -ErrorAction SilentlyContinue)) {
             Set-ItemProperty -Path $path -Name $key -Value 0
             Write-Host "Created $key key for $username for Acrobat $version $arch" -ForegroundColor DarkGreen
-        } else {
+        }
+        else {
             #Write-Host "Working on path $path"
-            if ($path -match "TrustManager") {$version = $path -replace '^.*\\([^\\]+)\\TrustManager$', '$1'}
-            else {$version = $path -replace '^.*\\([^\\]+)\\Privileged$', '$1'}
+            if ($path -match "TrustManager") { $version = $path -replace '^.*\\([^\\]+)\\TrustManager$', '$1' }
+            else { $version = $path -replace '^.*\\([^\\]+)\\Privileged$', '$1' }
             Write-Host "Disabling $key for $username for Acrobat $version $arch"
             Set-ItemProperty -Path $path -Name $key -Value 0
         }
     } 
     # Iterate over every user registry profile
     Clear-Host
-    Get-ChildItem -Path "Registry::HKEY_USERS\" | Where-Object { $_.Name -match '^HKEY_USERS\\S-1-5-21-' -and $_.Name -notmatch '_Classes$'} | ForEach-Object {
+    Get-ChildItem -Path "Registry::HKEY_USERS\" | Where-Object { $_.Name -match '^HKEY_USERS\\S-1-5-21-' -and $_.Name -notmatch '_Classes$' } | ForEach-Object {
         $sid = $_.Name -replace '^HKEY_USERS\\', ''
         $username = Get-UserFromSID $sid
         Write-Host "Found user: $username" -ForegroundColor DarkGreen
@@ -530,10 +548,12 @@ Function Set-AdobeSettings {
                     Set-SecuritySettings "Registry::$_\Privileged" "32-Bit"
                     Write-Host
                 }
-            } else {
+            }
+            else {
                 Write-Host "Volatile Environment detected for SID $sid, skipping this profile."
             }
-        } else {
+        }
+        else {
             Write-Host "Acrobat 32-Bit not found"
         }
 
@@ -548,10 +568,12 @@ Function Set-AdobeSettings {
                     Set-SecuritySettings "Registry::$_\TrustManager" "bEnhancedSecurityInBrowser" "64-Bit"
                     Set-SecuritySettings "Registry::$_\Privileged" "bProtectedMode" "64-Bit"
                 }
-            } else {
+            }
+            else {
                 Write-Host "Volatile Environment detected for SID $sid, skipping this profile."
             }
-        } else {
+        }
+        else {
             Write-Host "Acrobat 64-Bit not found"
         }
 
@@ -612,10 +634,12 @@ Function Get-ADDeviceInfo {
                     DiskSize_GB  = [math]::Round(($disk.Size / 1GB), 2)
                     SerialNumber = $bios.SerialNumber
                 }
-            } else {
+            }
+            else {
                 Write-Warning "$computer is offline or unreachable."
             }
-        } catch {
+        }
+        catch {
             Write-Warning "Failed to get data from $computer. Error: $_"
         }
     }
@@ -657,7 +681,7 @@ Enter the number of your choice
                 Read-Host "Press Enter to try again"
             }
         }
-        } while ($powerChoice -ne "7")
+    } while ($powerChoice -ne "7")
     
 }
 # Download, extract, and run wiztree
@@ -716,7 +740,7 @@ Function Invoke-DotNetRepair {
     $installUrl = "https://obtoolbox-public.s3.us-east-2.amazonaws.com/3rd-party-tools/NetFxRepairTool.exe"
     $targetDir = "C:\DotNetRepair"
     Clear-Host; Write-Host "Installing and Starting .Net Repair Tool"
-    if (-Not (Test-Path -Path $targetDir)) {New-Item -ItemType Directory -Path $targetDir -Force | Out-Null}
+    if (-Not (Test-Path -Path $targetDir)) { New-Item -ItemType Directory -Path $targetDir -Force | Out-Null }
     Invoke-WebRequest -Uri $installUrl -OutFile "$targetDir\NetFxRepairTool.exe"
     Clear-Host; Write-Host "Running .Net Repair Tool."
     Start-Process -FilePath "$targetDir\NetFxRepairTool.exe" -Verb RunAs
@@ -731,7 +755,7 @@ Function Invoke-TDOXDRW11Fix {
     $installUrl = "https://obtoolbox-public.s3.us-east-2.amazonaws.com/3rd-party-tools/TDOXDRWin11Fix.exe"
     $targetDir = "C:\TDOXDRWin11Fix"
     Clear-Host; Write-Host "Installing and Starting .Net Repair Tool"
-    if (-Not (Test-Path -Path $targetDir)) {New-Item -ItemType Directory -Path $targetDir -Force | Out-Null}
+    if (-Not (Test-Path -Path $targetDir)) { New-Item -ItemType Directory -Path $targetDir -Force | Out-Null }
     Start-BitsTransfer -Source $installUrl -Destination "$targetDir\TDOXDRWin11Fix.exe"
     Clear-Host; Write-Host "Downloading the script"
     Start-Process -FilePath "$targetDir\TDOXDRWin11Fix.exe" -Verb RunAs
@@ -755,21 +779,21 @@ Function Invoke-NetScan {
     $Runspaces = $FirstIP..$LastIP | ForEach-Object {
         $IP = "$Subnet.$_"
         $Runspace = [powershell]::Create().AddScript({
-            param ($IP, $Results)
+                param ($IP, $Results)
             
-            # Test connectivity and retrieve details if online
-            if (Test-Connection -ComputerName $IP -Count 1 -Quiet) {
-                $DeviceName = (Resolve-DnsName -Name $IP -ErrorAction SilentlyContinue).NameHost
-                $MAC = (Get-NetNeighbor -InterfaceAlias "*" | Where-Object {$_.IPAddress -eq $IP}).LinkLayerAddress
+                # Test connectivity and retrieve details if online
+                if (Test-Connection -ComputerName $IP -Count 1 -Quiet) {
+                    $DeviceName = (Resolve-DnsName -Name $IP -ErrorAction SilentlyContinue).NameHost
+                    $MAC = (Get-NetNeighbor -InterfaceAlias "*" | Where-Object { $_.IPAddress -eq $IP }).LinkLayerAddress
 
-                # Store online device details
-                $Results.Add([PSCustomObject]@{
-                    "IP Address"  = $IP
-                    "Device Name" = $DeviceName
-                    "MAC Address" = $MAC
-                }) | Out-Null
-            }
-        }).AddArgument($IP).AddArgument($Results)
+                    # Store online device details
+                    $Results.Add([PSCustomObject]@{
+                            "IP Address"  = $IP
+                            "Device Name" = $DeviceName
+                            "MAC Address" = $MAC
+                        }) | Out-Null
+                }
+            }).AddArgument($IP).AddArgument($Results)
 
         $Runspace.RunspacePool = $RunspacePool
         [PSCustomObject]@{ Pipe = $Runspace; Status = $Runspace.BeginInvoke() }
@@ -786,7 +810,8 @@ Function Invoke-NetScan {
     if ($SaveToFile -match "^[Yy]$") {
         $SortedResults | Format-Table -AutoSize | Out-File -Encoding UTF8 -FilePath $OutputFile
         Write-Host "Results saved to $OutputFile" -ForegroundColor Green
-    } else {
+    }
+    else {
         Write-Host "Results NOT saved." -ForegroundColor Yellow
     }
     Invoke-PounceCat "Press enter to continue"; Read-Host
@@ -795,7 +820,7 @@ Function Invoke-TeamViewerQS {
     $installUrl = "https://www.teamviewer.com/link/?url=505374"
     $targetDir = "C:\TeamViewerQS"
     Clear-Host; Write-Host "Downloading and Starting TeamViewer"
-    if (-Not (Test-Path -Path $targetDir)) {New-Item -ItemType Directory -Path $targetDir -Force | Out-Null}
+    if (-Not (Test-Path -Path $targetDir)) { New-Item -ItemType Directory -Path $targetDir -Force | Out-Null }
     Invoke-WebRequest -Uri $installUrl -OutFile "$targetDir\TeamViewerQS.exe"
     Clear-Host; Write-Host "Running TeamViewer"
     Start-Process -FilePath "$targetDir\TeamViewerQS.exe" -Verb RunAs
@@ -811,7 +836,7 @@ Function Invoke-NewTeamViewerQS {
     $installUrl = "https://www.teamviewer.com/link/?url=505374"
     $targetDir = "C:\TeamViewerQS"
     Clear-Host; Write-Host "Downloading and Starting TeamViewer"
-    if (-Not (Test-Path -Path $targetDir)) {New-Item -ItemType Directory -Path $targetDir -Force | Out-Null}
+    if (-Not (Test-Path -Path $targetDir)) { New-Item -ItemType Directory -Path $targetDir -Force | Out-Null }
     Start-BitsTransfer -Source $installUrl -Destination "$targetDir\TeamViewerQS.exe"
     Clear-Host; Write-Host "Running TeamViewer"
     Start-Process -FilePath "$targetDir\TeamViewerQS.exe" -Verb RunAs
@@ -827,7 +852,7 @@ Function Invoke-DentrixInstallMigrateTool {
     $installUrl = "https://dentrix.com/support/core/MigrationAndInstallTool.exe"
     $targetDir = "C:\DentrixInstallMigrateTool"
     Clear-Host; Write-Host "Downloading and Starting Dentrix Installation and Migration tool"
-    if (-Not (Test-Path -Path $targetDir)) {New-Item -ItemType Directory -Path $targetDir -Force | Out-Null}
+    if (-Not (Test-Path -Path $targetDir)) { New-Item -ItemType Directory -Path $targetDir -Force | Out-Null }
     Start-BitsTransfer -Source $installUrl -Destination "$targetDir\DentrixInstallMigrateTool.exe"
     Clear-Host; Write-Host "Running the tool"
     Start-Process -FilePath "$targetDir\DentrixInstallMigrateTool.exe" -Verb RunAs
@@ -886,10 +911,10 @@ function Invoke-HoldMusicSection {
         Clear-Host
         Write-Host "Hold Music Section`n" -ForegroundColor DarkCyan
         $holdMusicTable = @(
-            [PSCustomObject]@{ Option = '1. Other'; Song = 'Opus No. 1 - Tim Carleton'}
-            [PSCustomObject]@{ Option = '2. Dexis'; Song = '12 Spanish Dances in G Major Arr. for Guitar'}
-            [PSCustomObject]@{ Option = '3. Comcast'; Song = 'Winelight - Grover Washington'}
-            [PSCustomObject]@{ Option = '4. Stop Music'}
+            [PSCustomObject]@{ Option = '1. Other'; Song = 'Opus No. 1 - Tim Carleton' }
+            [PSCustomObject]@{ Option = '2. Dexis'; Song = '12 Spanish Dances in G Major Arr. for Guitar' }
+            [PSCustomObject]@{ Option = '3. Comcast'; Song = 'Winelight - Grover Washington' }
+            [PSCustomObject]@{ Option = '4. Stop Music' }
         )
         $holdMusicTable | Format-Table -AutoSize
 
@@ -911,10 +936,12 @@ Function Open-ExternalLink {
     # Open with default browser associated with URLs using multiple fallbacks
     try {
         [System.Diagnostics.Process]::Start($Url) | Out-Null
-    } catch {
+    }
+    catch {
         try {
             Start-Process -FilePath $Url -ErrorAction Stop
-        } catch {
+        }
+        catch {
             Start-Process "cmd.exe" -ArgumentList "/c start `""" + $Url + "`""" -WindowStyle Hidden
         }
     }
@@ -953,7 +980,8 @@ Function Set-SidexisServerPath {
     try {
         Set-ItemProperty -Path $regPath -Name "DeploymentShare" -Value $newPath
         Write-Host "DeploymentShare updated successfully to '$newPath'." -ForegroundColor Green
-    } catch {
+    }
+    catch {
         Write-Host "Failed to update registry: $_" -ForegroundColor Red
         return
     }
@@ -983,11 +1011,13 @@ Control Panel > Uninstall Programs > Double Click 'Microsoft SQL Server 2017' > 
 "@)
         if ($response -eq 'SKIP') {
             # Uninstall SQL instance is not automated yet
-        } else {
+        }
+        else {
             Write-Output "Aborting installation."
             exit
         }
-    } else {
+    }
+    else {
         Write-Host "Verified no other SidexisSQL instance exists."
     }
 }
@@ -1087,7 +1117,8 @@ IACCEPTSQLSERVERLICENSETERMS="True"
             try {
                 Start-Service -Name $sqlServiceName -ErrorAction Stop
                 Start-Sleep -Seconds 5
-            } catch {
+            }
+            catch {
                 Write-Warning "SQL Service failed to start. Attempting rebuild..."
 
                 # Run RebuildDatabase
@@ -1098,23 +1129,27 @@ IACCEPTSQLSERVERLICENSETERMS="True"
                 try {
                     Start-Service -Name $sqlServiceName
                     Write-Host "Service started after rebuild."
-                } catch {
+                }
+                catch {
                     Write-Error "Rebuild failed or service could not be started."
                 }
             }
-        } elseif ($service -and $service.Status -eq 'Running') {
+        }
+        elseif ($service -and $service.Status -eq 'Running') {
             Write-Host "SQL Server instance '$instanceName' is running."
-        } else {
+        }
+        else {
             Write-Error "Service $sqlServiceName not found."
         }
-    } else {
+    }
+    else {
         Write-Error "SETUP.EXE not found after waiting $timeout seconds. Install aborted."
     }
     Remove-Item -Recurse "C:\SQL2017"
 }
 function Get-LatestDBBackups {
     param (
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory = $true)]
         [string]$dbBackupDir
     )
 
@@ -1129,33 +1164,35 @@ function Get-LatestDBBackups {
 
     # Get latest PDATA_SQLEXPRESS.bak
     $latestPdataBak = $bakFiles |
-        Where-Object { $_.Name -like '*_PDATA_SQLEXPRESS.bak' } |
-        Sort-Object LastWriteTime -Descending |
-        Select-Object -First 1
+    Where-Object { $_.Name -like '*_PDATA_SQLEXPRESS.bak' } |
+    Sort-Object LastWriteTime -Descending |
+    Select-Object -First 1
 
     # Get latest SIDEXIS.bak
     $latestSidexisBak = $bakFiles |
-        Where-Object { $_.Name -like '*_SIDEXIS.bak' } |
-        Sort-Object LastWriteTime -Descending |
-        Select-Object -First 1
+    Where-Object { $_.Name -like '*_SIDEXIS.bak' } |
+    Sort-Object LastWriteTime -Descending |
+    Select-Object -First 1
 
     # Output results
     if ($latestPdataBak) {
         Write-Output "Latest PDATA_SQLEXPRESS.bak: $($latestPdataBak.Name) - Last Modified: $($latestPdataBak.LastWriteTime)"
-    } else {
+    }
+    else {
         Write-Warning "No PDATA_SQLEXPRESS.bak files found."
     }
 
     if ($latestSidexisBak) {
         Write-Output "Latest SIDEXIS.bak: $($latestSidexisBak.Name) - Last Modified: $($latestSidexisBak.LastWriteTime)"
-    } else {
+    }
+    else {
         Write-Warning "No SIDEXIS.bak files found."
     }
 
     # Return as output variables
     return @{
         PDATA_SQLEXPRESS = $latestPdataBak
-        SIDEXIS = $latestSidexisBak
+        SIDEXIS          = $latestSidexisBak
     }
 }
 function Find-SqlCmd {
@@ -1173,7 +1210,8 @@ function Find-SqlCmd {
                 Write-Host "Found sqlcmd at: $($result.FullName)"
                 return $result.FullName
             }
-        } catch {}
+        }
+        catch {}
     }
 
     Write-Warning "sqlcmd.exe not found. Manual restore required."
@@ -1250,9 +1288,11 @@ WITH MOVE N'$($logical.Data)' TO N'$mdfPath',
             }
 
             Write-Host "$dbName restored successfully."
-        } catch {
+        }
+        catch {
             Write-Error "❌ Failed to restore $dbName. Please restore it manually. Details: $_"
-        } finally {
+        }
+        finally {
             if ($tempSqlFile) { Remove-Item $tempSqlFile.FullName -Force -ErrorAction SilentlyContinue }
         }
     }
@@ -1270,13 +1310,15 @@ WITH MOVE N'$($logical.Data)' TO N'$mdfPath',
 
     if ($PDATA_SQLEXPRESS) {
         Restore-Database -dbName "PDATA" -bakPath $($PDATA_SQLEXPRESS.FullName)
-    } else {
+    }
+    else {
         Write-Warning "❌ Could not find a PDATA_SQLEXPRESS .bak file."
     }
 
     if ($SIDEXIS) {
         Restore-Database -dbName "SIDEXIS" -bakPath $($SIDEXIS.FullName)
-    } else {
+    }
+    else {
         Write-Warning "❌ Could not find a SIDEXIS .bak file."
     }
 }
@@ -1316,12 +1358,15 @@ GO
 
         if ($process.ExitCode -eq 0) {
             Write-Host "Row(s) with TargetType=0 deleted from dbo.ProvisioningJob successfully."
-        } else {
+        }
+        else {
             Write-Error "Failed to delete row from dbo.ProvisioningJob. Exit code: $($process.ExitCode)"
         }
-    } catch {
+    }
+    catch {
         Write-Error "Error running sqlcmd: $_"
-    } finally {
+    }
+    finally {
         Remove-Item -Path $tempSqlFile -ErrorAction SilentlyContinue
     }
 }
@@ -1339,23 +1384,23 @@ Function Open-SidexisMigrationSection {
 5. Provision each workstation to use the new PDATA share (Run on each workstation)
 
 "@
-    Write-Host "For Aquisition Server and IO Software:" -ForegroundColor DarkYellow                                                
-    Write-Host @" 
+        Write-Host "For Aquisition Server and IO Software:" -ForegroundColor DarkYellow                                                
+        Write-Host @" 
 7. Sidexis Migration Documentation
 
 "@                                               
-    Write-Host @" 
+        Write-Host @" 
 00. Exit Sidexis Database Migration        
 "@
-$dentalChoice = Read-Host "Enter the number of your choice"
+        $dentalChoice = Read-Host "Enter the number of your choice"
     
 
         switch ($dentalChoice) {
-            "1"  { Start-Process powershell.exe -ArgumentList "-NoProfile -Command & {Import-Module '$env:TEMP\obsoftware\ob.psm1'; Install-SSMS}" -Verb RunAs }
-            "2"  { Start-Process powershell.exe -ArgumentList "-NoProfile -Command & {Import-Module '$env:TEMP\obsoftware\ob.psm1'; Install-SIDEXIS_SQL}" -Verb RunAs }
-            "3"  { Start-Process powershell.exe -ArgumentList "-NoProfile -Command & {Import-Module '$env:TEMP\obsoftware\ob.psm1'; Restore-DBBackups; Remove-ProvisioningJobTargetType0 -sqlInstance 'localhost\SIDEXIS_SQL' -sqlUser 'sa' -sqlPassword '2BeChanged!'; pause}" -Verb RunAs }
-            "5"  { Set-SidexisServerPath; Read-Host "Press enter to dismiss"}
-            "7"  { Open-ExternalLink "https://www.dentsplysironasupport.com/content/dam/master/product-procedure-brand-categories/imaging/product-categories/software/imaging-software/sidexis-4/Sidexis%204%20Migration%20Guide%20Rev.2.pdf"}
+            "1" { Start-Process powershell.exe -ArgumentList "-NoProfile -Command & {Import-Module '$env:TEMP\obsoftware\ob.psm1'; Install-SSMS}" -Verb RunAs }
+            "2" { Start-Process powershell.exe -ArgumentList "-NoProfile -Command & {Import-Module '$env:TEMP\obsoftware\ob.psm1'; Install-SIDEXIS_SQL}" -Verb RunAs }
+            "3" { Start-Process powershell.exe -ArgumentList "-NoProfile -Command & {Import-Module '$env:TEMP\obsoftware\ob.psm1'; Restore-DBBackups; Remove-ProvisioningJobTargetType0 -sqlInstance 'localhost\SIDEXIS_SQL' -sqlUser 'sa' -sqlPassword '2BeChanged!'; pause}" -Verb RunAs }
+            "5" { Set-SidexisServerPath; Read-Host "Press enter to dismiss" }
+            "7" { Open-ExternalLink "https://www.dentsplysironasupport.com/content/dam/master/product-procedure-brand-categories/imaging/product-categories/software/imaging-software/sidexis-4/Sidexis%204%20Migration%20Guide%20Rev.2.pdf" }
         }
     } while ($dentalChoice -ne "00")
 }

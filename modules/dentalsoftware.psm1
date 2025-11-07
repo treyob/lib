@@ -56,11 +56,9 @@ Function Invoke-ESServConnectFix {
                 Write-Host "An error occurred while copying the 'machine.config.default': $_" -ForegroundColor Red
             }    
         }
-        else { Write-Host "Did not find 'machine.config' or 'machine.config.default'. Operation failed." -ForegroundColor Red}
+        else { Write-Host "Did not find 'machine.config' or 'machine.config.default'. Operation failed." -ForegroundColor Red }
 
     }
-    Write-Host "Press Enter to continue." -ForegroundColor Blue
-    Read-Host
 }
 Function Invoke-ESHexDecFix {
     [CmdletBinding()]
@@ -93,12 +91,16 @@ Function Invoke-ESHexDecFix {
         if (Test-Path $eaglesoftPath) {
             Start-Process $eaglesoftPath
             Write-Host "Relaunched Eaglesoft."
-        } else {
+        }
+        else {
             Write-Host "Eaglesoft executable not found. Open manually"
         }
-    } else {
+    }
+    else {
         Write-Host "Patterson_Companies folder not found at $pattersonPath"
     }
+    Write-Host "Press Enter to continue." -ForegroundColor Blue
+    Read-Host
 }
 Function Clear-EZCache {
     [CmdletBinding()]
@@ -109,7 +111,8 @@ Function Clear-EZCache {
     if (-Not (Test-Path -PathType Container -Path $ezCachePath)) {
         Write-Warning "EZDent cache folder not found! Exiting"; Read-Host "Press Enter to continue"
         return
-    } else {
+    }
+    else {
         Write-Host "Found EZDent cache folder, continuing"
     }
 
@@ -132,7 +135,8 @@ Function Clear-EZCache {
     Remove-Item -Recurse $ezCachePath -Force
     if (-Not (Test-Path -PathType Container -Path $ezCachePath)) {
         Write-Host "EZDent cache successfully cleared" -ForegroundColor DarkGreen; Read-Host "Press Enter to continue"
-    } else {
+    }
+    else {
         Write-Warning "Something went wrong. EZDent cache could not be deleted. You can try manually. `nPath: $ezCachePath"; pause
     }
 }
@@ -182,6 +186,217 @@ function Install-ESDexisSensorIntegration {
         Write-Error "An error occurred: $_"
     }
 }
+Function Disable-MemoryIntegrity {
+    # Define registry paths
+    $mciKey = "HKLM:\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity"
+    $vbsKey = "HKLM:\SYSTEM\CurrentControlSet\Control\DeviceGuard"
+
+    # Try to read the current values
+    try {
+        $mciValue = (Get-ItemProperty -Path $mciKey -Name Enabled -ErrorAction Stop).Enabled
+    }
+    catch {
+        Write-Warning "Memory Integrity registry key not found. It may not be enabled on this system."
+        Start-Sleep -Seconds 2
+        return
+    }
+
+    try {
+        $vbsValue = (Get-ItemProperty -Path $vbsKey -Name EnableVirtualizationBasedSecurity -ErrorAction Stop).EnableVirtualizationBasedSecurity
+    }
+    catch {
+        $vbsValue = 0
+    }
+
+    # Check if already disabled
+    if ($mciValue -eq 0 -and $vbsValue -eq 0) {
+        Write-Host "✅ Memory Integrity is already disabled. No changes made."
+        Start-Sleep -Seconds 2
+        return
+    }
+
+    # Disable Memory Integrity
+    Set-ItemProperty -Path $mciKey -Name Enabled -Value 0
+    Set-ItemProperty -Path $vbsKey -Name EnableVirtualizationBasedSecurity -Value 0
+
+    Write-Warning "⚠️ Memory Integrity has been disabled. Please restart your computer for changes to take effect."
+}
+function Stop-EaglesoftProcesses {
+    Write-Host "Checking for Eaglesoft-related processes..." -ForegroundColor Blue
+    $processesToStop = @("Eaglesoft", "esmessenger", "esiconnect", "AutoDetectServer")
+    foreach ($processName in $processesToStop) {
+        $process = Get-Process -Name $processName -ErrorAction SilentlyContinue
+        if ($process) {
+            Write-Host "$processName is running. Stopping process..."
+            Stop-Process -Name $processName -Force
+        }
+        else {
+            Write-Host "$processName is not running."
+        }
+    }
+}
+Function Install-MSXML4 {
+    Clear-Host
+    Write-Host "Downloading MSXML4 install"
+    $destinationDir = "$env:TEMP\obsoftware\msxml" 
+    if (-not (Test-Path -Path $destinationDir)) {
+        mkdir $destinationDir
+    }
+    $exists = Get-ChildItem -Path $destinationDir -Filter "msxml4-*.exe" | Where-Object { -not $_.PSIsContainer }
+    if ($exists) {
+        Write-Host "Found MSXML 4.0 installer, skipping download"
+    }
+    else {
+        Start-BitsTransfer -Source "https://pattersonsupport.custhelp.com/euf/assets/Answers/20595/MSXML_4.0.zip" -Destination "$destinationDir\MSXML4.0.zip"
+        Expand-Archive -Path "$destinationDir\MSXML4.0.zip" -DestinationPath $destinationDir
+        Remove-Item "$destinationDir\MSXML4.0.zip" > $null
+    }
+    $file = Get-ChildItem -Path $destinationDir -Filter "msxml4-*.exe" | Select-Object -First 1
+    if ($file) {
+        Start-Process $file.FullName -Verb RunAs -Wait
+        do {
+            $process = Get-Process -Name "$($file.BaseName)" -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 1
+        } while ($process)
+        Remove-Item $destinationDir -Force -Recurse > $null 
+    }
+    else {
+        Write-Host "No MSXML4 installer found." -ForegroundColor Red
+    }
+}
+Function Install-IOSS {
+    $destinationDir = "$env:TEMP\obsoftware\IOSS" 
+    $downloadLink = "https://www.dentsplysironasupport.com/content/dam/master/product-procedure-brand-categories/imaging/product-categories/software/schick-software/IOSS_v3.2.zip"
+    if (-not (Test-Path -Path $destinationDir)) {
+        mkdir $destinationDir
+    }
+    Start-BitsTransfer -Source $downloadLink -Destination "$destinationDir\IOSS.zip"
+    Expand-Archive -Path "$destinationDir\IOSS.zip" -DestinationPath $destinationDir
+    Remove-Item "$destinationDir\IOSS.zip" -Force -ErrorAction SilentlyContinue
+    Start-Process "$destinationDir\IOSS_v3.2\Autorun.exe" -Verb RunAs -Wait
+    do {
+        $process = Get-Process -Name "Autorun" -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 1
+    } while ($process)
+    Remove-Item $destinationDir -Force -Recurse -ErrorAction SilentlyContinue | Out-Null
+}
+# The goal of this function is to automatically restart the service on failure and change "logon as" to local system account
+Function Optimize-IOSSService {
+    [CmdletBinding()]
+    Param()
+    Start-Process -FilePath "sc.exe" -ArgumentList 'config', 'SironaUSBService', 'obj=', 'LocalSystem' -NoNewWindow -Wait
+    Write-Host "Set LogOn user to LocalSystem"
+    Start-Process -FilePath "sc.exe" -ArgumentList 'failure', 'SironaUSBService', 'reset=', '0', 'actions=', 'restart/5000/restart/5000/restart/5000' -NoNewWindow -Wait
+    Write-Host "Set to restart service on failure"
+
+    try {
+        Write-Host "Setting StartupType to Automatic (Delayed)"
+        Set-Service -Name SironaUSBService -StartupType AutomaticDelayed -ErrorAction Stop
+        Write-Host "IOSS Service set to Automatic (Delayed) startup" -ForegroundColor Green
+    }
+    catch {
+        Write-Error "Unable to set service `"Sirona Intraoral Sensor Software`" StartupType to `"Automatic Delayed.`" Please do so manually."
+        Write-Error "$_"
+        Pause
+    }
+    try {
+        Write-Host "Restarting IOSS Service"
+        Restart-Service -Name SironaUSBService -ErrorAction Stop
+        Write-Host "IOSS Service restarted" -ForegroundColor Green
+        Start-Sleep -Seconds 1
+    }
+    catch {
+        Write-Error "Failed to restart the `"Sirona Intraoral Sensor Software`" service. Please do so manually"
+        Write-Error "$_"
+        pause
+    }
+}
+function Install-ESSchickSensorIntegration {
+    param (
+        [string]$DownloadUrl = "https://obtoolbox-public.s3.us-east-2.amazonaws.com/3rd-party-tools/Schick_Sensor_Integration.reg",
+        [string]$DestinationPath = "$env:TEMP\obsoftware\Schick_Sensor_Integration.reg"
+    )
+
+    try {
+        Write-Host "Downloading .reg file from $DownloadUrl..." -ForegroundColor Cyan
+        Invoke-WebRequest -Uri $DownloadUrl -OutFile $DestinationPath -UseBasicParsing
+        Write-Host "Download complete. File saved to $DestinationPath" -ForegroundColor Green
+
+        Write-Host "Importing registry file..." -ForegroundColor Cyan
+        Start-Process -FilePath "reg.exe" -ArgumentList "import `"$DestinationPath`"" -Verb RunAs -Wait
+
+        Write-Host "Schick Sensor Registry file successfully imported." -ForegroundColor Green
+        Start-Sleep -Seconds 2
+    }
+    catch {
+        Write-Error "An error occurred: $_"
+    }
+}
+
+Function Install-CDREliteDriver {
+    $destinationDir = "$env:TEMP\obsoftware\CDRElite" 
+    $downloadLink = "https://www.dentsplysironasupport.com/content/dam/websites/dentsplysironasupport/schick-brand-software/CDRElite5_16.zip"
+    $zipFileName = "CDR.zip"
+    $processName = "CDR Elite Setup"
+    if ((Test-Path -Path $destinationDir)) {
+        Remove-Item $destinationDir -Force -Recurse > $null
+    }
+    mkdir $destinationDir
+    Start-BitsTransfer -Source $downloadLink -Destination "$destinationDir\$zipFileName"
+    Expand-Archive -Path "$destinationDir\$zipFileName" -DestinationPath $destinationDir
+    Remove-Item "$destinationDir\$zipFileName"
+    Start-Process "$destinationDir\CDRElite\CDR Elite Setup.exe" -Verb RunAs -Wait
+    do { 
+        $process = Get-Process -Name $processName -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 1
+    } while ($process)
+}
+Function Install-CDRPatch {
+    $patchMsiPath = "$env:TEMP\obsoftware\CDRElite\CDRElite\Patch\CDRPatch-2808.msi"
+    Stop-EaglesoftProcesses
+    $path = "C:\Program Files (x86)\Schick Technologies\Shared Files"
+    $excludedFiles = @("CDRData.dll", "OMEGADLL.dll")
+    # Delete all files except the excluded ones
+    Get-ChildItem -Path $path -File | Where-Object { $excludedFiles -notcontains $_.Name } | Remove-Item -Force
+    # Delete all subfolders
+    Get-ChildItem -Path $path -Directory | Remove-Item -Recurse -Force
+    if (Test-Path $patchMsiPath) {
+        Write-Host "Installing CDRPatch"
+        Start-Process -FilePath "msiexec.exe" -ArgumentList "/i `"$patchMsiPath`" /qn /norestart" -Wait -Verb RunAs
+    }
+    else {
+        Write-Warning "Patch MSI not found: $patchMsiPath"
+    }
+}
+Function Invoke-ESIOSSSection {
+    do {
+        Clear-Host
+        Write-Host "Eaglesoft 24 Schick Stuff`n" -ForegroundColor DarkCyan
+        $es24SchickTable = @(
+            [PSCustomObject]@{ Step = '1'; Script = 'Disable Memory Integrity' }
+            [PSCustomObject]@{ Step = '2'; Script = 'MSXML 4.0 Install' }
+            [PSCustomObject]@{ Step = '3'; Script = 'Install IOSS' }
+            [PSCustomObject]@{ Step = '4'; Script = 'Optimize the IOSS Service' }
+            [PSCustomObject]@{ Step = '5'; Script = 'Install CDRElite Driver' }
+            [PSCustomObject]@{ Step = '6'; Script = 'CDRElite Patching and Configuring ES24.20+' }
+            [PSCustomObject]@{ Step = '7'; Script = 'Schick Sensor Integration for OPs' }
+        )
+        $es24SchickTable | Format-Table -AutoSize
+        $es24SchickChoice = Read-Host "Enter the number of your choice, or press enter to exit"
+        switch ($es24SchickChoice) {
+            "1" { Disable-MemoryIntegrity }
+            "2" { Install-MSXML4 }
+            "3" { Install-IOSS }
+            "4" { Optimize-IOSSService }
+            "5" { Install-CDREliteDriver }
+            "6" { Install-CDRPatch }
+            "7" { Install-ESSchickSensorIntegration }
+            "" { Write-Host "Exiting" }
+            Default { Write-Host "Invalid, please try again" -ForegroundColor DarkYellow; Start-Sleep -Seconds 1 }
+        }
+    } while ($es24SchickChoice -ne "")
+
+}
 
 Function Invoke-DentalSoftwareSection {
     do {
@@ -189,29 +404,29 @@ Function Invoke-DentalSoftwareSection {
         Write-Host "Dental Software Section`n" -ForegroundColor DarkCyan
         Write-Host "Patterson Dental" -ForegroundColor DarkYellow
         Write-Host @"
-1. Eaglesoft machine.config Fix: Unable to contact ES Server
-2. Eaglesoft Hexdec Fix: White Screen in Pt. acct 
-3. Eaglesoft SmartDoc fix: Only scanning 1 page at a time or
+1. Eaglesoft General Fix (machine.config & hexadec)
+2. Eaglesoft SmartDoc fix: Only scanning 1 page at a time or
     DriverInit Failed when scanning                     _._     _,-'""```-._
-4. Eaglesoft Download                                 (,-.```._,'(       |\```-/| 
-5. Schick with Eaglesoft 24                                ```-.-' \ )-```( , o o)
-6. Eaglesoft Dexis/Gendex sensor integration                      ```-    \```_`"'-"
+3. Eaglesoft Download                                 (,-.```._,'(       |\```-/| 
+4. Schick with Eaglesoft 24                                ```-.-' \ )-```( , o o)
+5. Eaglesoft Dexis/Gendex sensor integration                      ```-    \```_`"'-"
+6. ES24.20 IOSS Configuration
 "@
-    Write-Host "VATECH" -ForegroundColor DarkYellow                                                
-    Write-Host @" 
+        Write-Host "VATECH" -ForegroundColor DarkYellow                                                
+        Write-Host @" 
 7. EzDent-i Fix: libiomp5md.dll error during IO acquisition
 8. Clear EzDent Cache
 
 "@
-    Write-Host "Sirona" -ForegroundColor DarkYellow                                                
-    Write-Host @" 
+        Write-Host "Sirona" -ForegroundColor DarkYellow                                                
+        Write-Host @" 
 9. Schick Drivers 
 10. Schick sensor Curve Hero documentation
-11. Sidexis Migration Section
+11. Sidexis Migration Section for 4.3
 
 "@
-    Write-Host "Others" -ForegroundColor DarkYellow                                                
-    Write-Host @" 
+        Write-Host "Others" -ForegroundColor DarkYellow                                                
+        Write-Host @" 
 
 12. Install Mouthwatch Drivers                                    
 13 TDO XDR Sensor Fix for Win11: TDO crashes when taking intraoral X-Rays
@@ -219,25 +434,31 @@ Function Invoke-DentalSoftwareSection {
 
 00. Exit Dental Software Section                               
 "@
-$dentalChoice = Read-Host "Enter the number of your choice"
+        $dentalChoice = Read-Host "Enter the number of your choice"
     
 
         switch ($dentalChoice) {
-            "1"  { Invoke-ESServConnectFix }
-            "2"  { Invoke-ESHexDecFix }
-            "3"  { Invoke-SmartDocScannerFix }
-            "4"  { Open-ExternalLink 'https://pattersonsupport.custhelp.com/app/answers/detail/a_id/23400#New%20Server' }
-            "5"  { Open-ExternalLink 'https://pattersonsupport.custhelp.com/app/answers/detail/a_id/44313/kw/44313' }
-            "6"  { Install-ESDexisSensorIntegration }
-            "7"  { Invoke-EZDentDLLFix }
-            "8"  { Clear-EZCache }
-            "9"  { Open-ExternalLink 'https://www.dentsplysironasupport.com/en-us/user_section/user_section_imaging/schick_brand_software.html' }
-            "10"  { Open-ExternalLink 'https://curvebulkdata-live.s3.amazonaws.com/35a4ab0e-5b82-4543-9eb9-4d1884e041b2/stored_files/843_68752747c6b9b_Schick_Legacy_Driver_Installation.pdf?response-content-disposition=inline%3B%20filename%2A%3DUTF-8%27%27Schick%2520Legacy%2520Driver%2520Installation.pdf&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAWM5JH3YWMSWI32JV%2F20250714%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20250714T155053Z&X-Amz-SignedHeaders=host&X-Amz-Expires=43200&X-Amz-Signature=2e1353fb90eeb0374c10f1043ba5c0b9e2b79fb8fd5be6b4b35ef1f239cb490b' }
+            "1" { 
+                Stop-EaglesoftProcesses
+                Invoke-ESServConnectFix 
+                Invoke-ESHexDecFix
+            }
+            "2" { Invoke-SmartDocScannerFix }
+            "3" { Open-ExternalLink 'https://pattersonsupport.custhelp.com/app/answers/detail/a_id/23400#New%20Server' }
+            "4" { Open-ExternalLink 'https://pattersonsupport.custhelp.com/app/answers/detail/a_id/44313/kw/44313' }
+            "5" { Install-ESDexisSensorIntegration }
+            "6" { Invoke-ESIOSSSection }
+            "7" { Invoke-EZDentDLLFix }
+            "8" { Clear-EZCache }
+            "9" { Open-ExternalLink 'https://www.dentsplysironasupport.com/en-us/user_section/user_section_imaging/schick_brand_software.html' }
+            "10" { Open-ExternalLink 'https://curvebulkdata-live.s3.amazonaws.com/35a4ab0e-5b82-4543-9eb9-4d1884e041b2/stored_files/843_68752747c6b9b_Schick_Legacy_Driver_Installation.pdf?response-content-disposition=inline%3B%20filename%2A%3DUTF-8%27%27Schick%2520Legacy%2520Driver%2520Installation.pdf&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAWM5JH3YWMSWI32JV%2F20250714%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20250714T155053Z&X-Amz-SignedHeaders=host&X-Amz-Expires=43200&X-Amz-Signature=2e1353fb90eeb0374c10f1043ba5c0b9e2b79fb8fd5be6b4b35ef1f239cb490b' }
             "11" { Open-SidexisMigrationSection }
             "12" { Install-MouthwatchDrivers }
             "13" { Start-Job -ScriptBlock { Import-Module "$env:TEMP\obsoftware\ob.psm1"; Invoke-TDOXDRW11Fix; Exit } > $null }
-            "14" { Start-Job -ScriptBlock { Import-Module "$env:TEMP\obsoftware\ob.psm1"; Invoke-DentrixInstallMigrateTool; Exit } > $null 
-        Read-Host "Dentrix Installation and Migration tool is downloading in the background and will start in a moment" }
+            "14" {
+                Start-Job -ScriptBlock { Import-Module "$env:TEMP\obsoftware\ob.psm1"; Invoke-DentrixInstallMigrateTool; Exit } > $null 
+                Read-Host "Dentrix Installation and Migration tool is downloading in the background and will start in a moment" 
+            }
         }
     } while ($dentalChoice -ne "00")
 }
