@@ -1,0 +1,51 @@
+OverBytesToolbox {
+    ScriptButton {
+        width: 100%;
+    }
+    Button {
+        width: 100%;
+        margin: 0;
+    }
+}
+OverBytesToolbox Container {
+    layout: grid;
+    background: $boost;
+    padding: 2;
+    align: center middle;
+}
+#dental-buttons Static {
+}
+#es-ioss-buttons {
+    
+}
+
+#left-column {
+    width: 30;
+    dock: left;
+}
+
+#right-column {
+    width: 30;
+    dock: right
+}
+.ascii-art {
+    width: 100%;
+    content-align: center middle;
+    color: cyan;
+    layer: below;
+}
+
+.hidden {
+    display: none;
+}
+
+
+AsciiTitle {
+    content-align: center middle;
+    background: $boost;
+    margin: 0 0 1 0;
+    min-width: 100;
+    Static {
+        content-align: center middle;
+    }
+}
