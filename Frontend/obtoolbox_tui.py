@@ -160,6 +160,8 @@ class OverBytesToolbox(App):
                 yield Static("Others")
                 yield ScriptButton(button_name="Install Mouthwatch Drivers",
                                    powershell_command="Install-MouthwatchDrivers")
+                yield ScriptButton(button_name="Install Daryou Drivers",
+                                   powershell_command="Install-DaryouDrivers")
                 yield ScriptButton(button_name="TDO XDR Sensor Fix for Win11",
                                    powershell_command="Invoke-TDOXDRW11Fix")
         with Container(id="es-ioss-buttons",

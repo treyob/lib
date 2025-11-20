@@ -175,10 +175,21 @@ Function Install-MouthwatchDrivers {
         Start-Sleep -Seconds 1
     } while ($process)
     Remove-Item -Recurse -Force "C:\mouthwatch.exe"
-
-
-
 }
+Function Install-DaryouDrivers {
+    [CmdletBinding()]
+    param()
+    Clear-Host
+    Write-Host "Downloading Daryou"
+    Start-BitsTransfer "https://obtoolbox-public.s3.us-east-2.amazonaws.com/3rd-party-tools/daryou.exe" -Destination "$env:temp\obsoftware\daryou.exe"
+    Invoke-UltraCat "Running Daryou. Install files will be deleted" " when daryou is closed"; Start-Process "$env:temp\obsoftware\daryou.exe"
+    do {
+        $process = Get-Process -Name "daryou" -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 1
+    } while ($process)
+    Remove-Item -Recurse -Force "$env:temp\obsoftware\daryou.exe"
+}
+
 function Install-ESDexisSensorIntegration {
     param (
         [string]$DownloadUrl = "https://obtoolbox-public.s3.us-east-2.amazonaws.com/3rd-party-tools/Gendex_Dexis_Integration.reg",
@@ -407,75 +418,4 @@ Function Invoke-ESIOSSSection {
         }
     } while ($es24SchickChoice -ne "")
 
-}
-
-Function Invoke-DentalSoftwareSection {
-    do {
-        Clear-Host
-        Write-Host "Dental Software Section`n" -ForegroundColor DarkCyan
-        Write-Host "Patterson Dental" -ForegroundColor DarkYellow
-        Write-Host @"
-1. Eaglesoft General Fix (machine.config & hexadec & ocxreg)
-2. Eaglesoft SmartDoc fix: Only scanning 1 page at a time or
-    DriverInit Failed when scanning                     _._     _,-'""```-._
-3. Eaglesoft Download                                 (,-.```._,'(       |\```-/| 
-4. Schick with Eaglesoft 24                                ```-.-' \ )-```( , o o)
-5. Eaglesoft Dexis/Gendex sensor integration                      ```-    \```_`"'-"
-6. ES24.20 IOSS Configuration
-"@
-        Write-Host "VATECH" -ForegroundColor DarkYellow                                                
-        Write-Host @" 
-7. EzDent-i Fix: libiomp5md.dll error during IO acquisition
-8. Clear EzDent Cache
-
-"@
-        Write-Host "Sirona" -ForegroundColor DarkYellow                                                
-        Write-Host @" 
-9. Schick Drivers 
-10. Sidexis Migration Section for 4.3
-
-"@
-        Write-Host "Others" -ForegroundColor DarkYellow                                                
-        Write-Host @" 
-
-11. Install Mouthwatch Drivers                                    
-12 TDO XDR Sensor Fix for Win11: TDO crashes when taking intraoral X-Rays
-13. Dentrix Installation and Migration Tool
-
-00. Exit Dental Software Section                               
-"@
-        $dentalChoice = Read-Host "Enter the number of your choice"
-    
-
-        switch ($dentalChoice) {
-            # Patterson
-            "1" { 
-                Stop-EaglesoftProcesses
-                Invoke-ESServConnectFix 
-                Invoke-ESHexDecFix
-                Invoke-OCXREGFix
-                Invoke-Eaglesoft
-                Write-Host "Press Enter to continue." -ForegroundColor Blue
-                Read-Host
-            }
-            "2" { Invoke-SmartDocScannerFix }
-            "3" { Open-ExternalLink 'https://pattersonsupport.custhelp.com/app/answers/detail/a_id/23400#New%20Server' }
-            "4" { Open-ExternalLink 'https://pattersonsupport.custhelp.com/app/answers/detail/a_id/44313/kw/44313' }
-            "5" { Install-ESDexisSensorIntegration }
-            "6" { Invoke-ESIOSSSection }
-            # VATECH
-            "7" { Invoke-EZDentDLLFix }
-            "8" { Clear-EZCache }
-            # Sirona
-            "9" { Open-ExternalLink 'https://www.dentsplysironasupport.com/en-us/user_section/user_section_imaging/schick_brand_software.html' }
-            "10" { Open-SidexisMigrationSection }
-            # Others
-            "11" { Install-MouthwatchDrivers }
-            "12" { Start-Job -ScriptBlock { Import-Module "$env:TEMP\obsoftware\ob.psm1"; Invoke-TDOXDRW11Fix; Exit } > $null }
-            "13" {
-                Start-Job -ScriptBlock { Import-Module "$env:TEMP\obsoftware\ob.psm1"; Invoke-DentrixInstallMigrateTool; Exit } > $null 
-                Read-Host "Dentrix Installation and Migration tool is downloading in the background and will start in a moment" 
-            }
-        }
-    } while ($dentalChoice -ne "00")
 }
