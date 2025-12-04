@@ -689,7 +689,8 @@ Function Invoke-WizTree {
     $zipUrl = "https://www.diskanalyzer.com/files/wiztree_4_24_portable.zip"
     $targetDir = "C:\WizTree"
     Clear-Host; Write-Host "Downloading WizTree"
-    Invoke-WebRequest -Uri $zipUrl -OutFile "$env:TEMP\wiztree.zip"
+    #Invoke-WebRequest -Uri $zipUrl -OutFile "$env:TEMP\wiztree.zip"
+    Start-BitsTransfer -Source $zipUrl -Destination "$env:TEMP\wiztree.zip"
     Clear-Host; Write-Host "Extracting WizTree"
     Expand-Archive -Path "$env:TEMP\wiztree.zip" -DestinationPath $targetDir
     Clear-Host; Write-Host "Running WizTree."

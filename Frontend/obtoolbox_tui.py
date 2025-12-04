@@ -120,9 +120,11 @@ class OverBytesToolbox(App):
                 yield ScriptButton(button_name="Run CLI Net Scan",
                                    powershell_command="Invoke-NetScan")
                 yield ScriptButton(button_name="Advanced IP Scanner",
-                                   powershell_command="Get-IPScanner")
+                                   powershell_command="Get-IPScanner",
+                                   hidden=True)
                 yield ScriptButton(button_name="WizTree",
-                                   powershell_command="Invoke-WizTree")
+                                   powershell_command="Invoke-WizTree",
+                                   hidden=True)
                 yield ScriptButton(button_name=".Net Repair Tool",
                                    powershell_command="Invoke-DotNetRepair",
                                    hidden=True)
