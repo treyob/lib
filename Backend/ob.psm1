@@ -706,8 +706,8 @@ Function Invoke-HWInfo {
     $targetDir = "C:\HWInfo"
     
     Clear-Host; Write-Host "Downloading hwinfo"
-    Invoke-WebRequest -Uri $zipUrl -OutFile "$env:TEMP\hwinfo.zip"
-    
+    #Invoke-WebRequest -Uri $zipUrl -OutFile "$env:TEMP\hwinfo.zip"
+    Start-BitsTransfer -Source $zipUrl -Destination "$env:TEMP\hwinfo.zip"
     Clear-Host; Write-Host "Extracting hwinfo"
     New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
     Expand-Archive -Path "$env:TEMP\hwinfo.zip" -DestinationPath $targetDir -Force

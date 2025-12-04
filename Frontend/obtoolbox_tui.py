@@ -38,8 +38,13 @@ class ScriptButton(Static):
                 "Import-Module \'$env:TEMP\\obsoftware\\ob.psm1\'; Import-Module \'$env:TEMP\\obsoftware\\dentalsoftware.psm1\';\
                     {self.powershell_command}; Start-Sleep -Seconds 3; Exit"'
         else:
-            # The hidden functionality is not yet functional. If I knew why, it would be functional
-            self.app.current_command = f"Start-Job -ScriptBlock {{ Import-Module \"$env:TEMP\\obsoftware\\ob.psm1\"; {self.powershell_command}; Exit }} > $null"
+            # Launch the command in a detached, hidden PowerShell process so it runs in background.
+            # Import both modules inside the new process so the function is available in that runspace.
+            self.app.current_command = (
+                f'Start-Process powershell.exe -WindowStyle Hidden -ArgumentList '
+                f'"-NoProfile", "-Command", "Import-Module \'$env:TEMP\\obsoftware\\ob.psm1\'; '
+                f'Import-Module \'$env:TEMP\\obsoftware\\dentalsoftware.psm1\'; {self.powershell_command}; Exit"'
+            )
         self.app.current_ps_command = f"{self.powershell_command}"
         self.app.sub_title = f"Selected: {self.button_name}"
 
@@ -119,13 +124,17 @@ class OverBytesToolbox(App):
                 yield ScriptButton(button_name="WizTree",
                                    powershell_command="Invoke-WizTree")
                 yield ScriptButton(button_name=".Net Repair Tool",
-                                   powershell_command="Invoke-DotNetRepair")
+                                   powershell_command="Invoke-DotNetRepair",
+                                   hidden=True)
                 yield ScriptButton(button_name="HWInfo",
-                                   powershell_command="Invoke-HWInfo")
+                                   powershell_command="Invoke-HWInfo",
+                                   hidden=True)
                 yield ScriptButton(button_name="TeamViewerQS",
-                                   powershell_command="Invoke-TeamViewerQS")
+                                   powershell_command="Invoke-TeamViewerQS",
+                                   hidden=True)
                 yield ScriptButton(button_name="Revo Uninstaller",
-                                   powershell_command="Invoke-RevoUninstaller")
+                                   powershell_command="Invoke-RevoUninstaller",
+                                   hidden=True)
                 yield ScriptButton(button_name="Office Install",
                                    powershell_command="Invoke-OfficeInstall")
                 yield ScriptButton(button_name="Hold Music",
@@ -139,11 +148,14 @@ class OverBytesToolbox(App):
                 yield ScriptButton(button_name="Reinstall SmartDoc Printer",
                                    powershell_command="Invoke-SmartDocScannerFix")
                 yield ScriptButton(button_name="Eaglesoft Download Page",
-                                   powershell_command="Open-ExternalLink 'https://pattersonsupport.custhelp.com/app/answers/detail/a_id/23400#New%20Server'")
+                                   powershell_command="Open-ExternalLink 'https://pattersonsupport.custhelp.com/app/answers/detail/a_id/23400#New%20Server'",
+                                   hidden=True)
                 yield ScriptButton(button_name="Schick with ES24.20+ Page",
-                                   powershell_command="Open-ExternalLink 'https://pattersonsupport.custhelp.com/app/answers/detail/a_id/44313/kw/44313'")
+                                   powershell_command="Open-ExternalLink 'https://pattersonsupport.custhelp.com/app/answers/detail/a_id/44313/kw/44313'",
+                                   hidden=True)
                 yield ScriptButton(button_name="Eaglesoft Dexis/Gendex sensor integration",
-                                   powershell_command="Install-CDREliteDriver")
+                                   powershell_command="Install-CDREliteDriver",
+                                   hidden=True)
                 yield ESIOSSButton()
                 yield Static("VATECH")
                 yield ScriptButton(button_name="libiomp5md.dll error fix",
@@ -154,14 +166,17 @@ class OverBytesToolbox(App):
             with VerticalScroll(id="right-column"):
                 yield Static("DentSply Sirona")
                 yield ScriptButton(button_name="Schick Drivers Page",
-                                   powershell_command="Open-ExternalLink 'https://www.dentsplysironasupport.com/en-us/user_section/user_section_imaging/schick_brand_software.html'")
+                                   powershell_command="Open-ExternalLink 'https://www.dentsplysironasupport.com/en-us/user_section/user_section_imaging/schick_brand_software.html'",
+                                   hidden=True)
                 yield ScriptButton(button_name="Sidexis Migration Section for 4.3",
                                    powershell_command="Open-SidexisMigrationSection")
                 yield Static("Others")
                 yield ScriptButton(button_name="Install Mouthwatch Drivers",
-                                   powershell_command="Install-MouthwatchDrivers")
+                                   powershell_command="Install-MouthwatchDrivers",
+                                   hidden=True)
                 yield ScriptButton(button_name="Install Daryou Drivers",
-                                   powershell_command="Install-DaryouDrivers")
+                                   powershell_command="Install-DaryouDrivers",
+                                   hidden=True)
                 yield ScriptButton(button_name="TDO XDR Sensor Fix for Win11",
                                    powershell_command="Invoke-TDOXDRW11Fix")
         with Container(id="es-ioss-buttons",
@@ -170,13 +185,16 @@ class OverBytesToolbox(App):
                 yield ScriptButton(button_name="1. Disable Memory Integrity",
                                    powershell_command="Disable-MemoryIntegrity")
                 yield ScriptButton(button_name="2. MSXML 4.0 Install",
-                                   powershell_command="Install-MSXML4")
+                                   powershell_command="Install-MSXML4",
+                                   hidden=True)
                 yield ScriptButton(button_name="3. Install IOSS",
-                                   powershell_command="Install-IOSS")
+                                   powershell_command="Install-IOSS",
+                                   hidden=True)
                 yield ScriptButton(button_name="4. Optimize the IOSS Service",
                                    powershell_command="Optimize-IOSSService")
                 yield ScriptButton(button_name="5. Install CDRElite Driver",
-                                   powershell_command="Install-CDREliteDriver")
+                                   powershell_command="Install-CDREliteDriver",
+                                   hidden=True)
                 yield ScriptButton(button_name="6. CDRElite Patching and Configuring ES24.20+",
                                    powershell_command="Install-CDRPatch")
                 yield ScriptButton(button_name="7. Schick Sensor Integration for OPs",

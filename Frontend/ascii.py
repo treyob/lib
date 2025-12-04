@@ -100,8 +100,8 @@ class NerdCatAscii(Static):
     def compose(self):
         yield Static(R"""
      ___
- _.-|   |          |\\__/,|   (`\\
+ _.-|   |          |\__/,|   (`\
 {   |   |          |o o  |__ _) )
  "-.|___|        _.( T   )  `  /
-  .--'-`-.     _((_ `^--' /_<  \\
+  .--'-`-.     _((_ `^--' /_<  \
 .+|______|__.-||__)`-'(((/  (((/""", id="nerd-cat", classes="ascii-art")
