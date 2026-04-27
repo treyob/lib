@@ -1,28 +1,29 @@
-''' TUI for OverBytes Toolbox '''
+''' TUI for Chimera Toolbox '''
 import subprocess
 from textual import on
 from textual.app import App
 from textual.containers import Container, VerticalScroll
 from textual.widgets import Button, Footer, Header, Static
-from ascii import ChonkCatAscii, ElGatoAscii, NerdCatAscii
+from ascii import ChonkCatAscii, ElGatoAscii, NerdCatAscii, TitleAscii
+from pathlib import Path
+import atexit
+import tempfile
+import shutil
 
+# Importing powershell modules
+script_dir = Path(__file__).resolve().parent
+backend_dir = script_dir.parent / "Backend"
+# End of powershell module import
 
-class AsciiTitle(Static):
+class Title(Static):
     '''The title in ascii'''
 
     def compose(self):
-        yield Static("""
-________                   __________          __                     .____    .____   _________  
-\\_____  \\___  __ __________\\______   \\___.__._/  |_  ____   ______    |    |   |    |  \\_   ___ \\
- /   |   \\  \\/ // __ \\_  __ \\    |  _<   |  |\\   __\\/ __ \\ /  ___/    |    |   |    |  /    \\  \\/
-/    |    \\   /\\  ___/|  | \\/    |   \\\\___  | |  | \\  ___/ \\___ \\     |    |___|    |__\\     \\____
-\\_______  /\\_/  \\___  |__|  |______  // ____| |__|  \\___  >____  > /\\ |_______ \\_______ \\______  /
-        \\/          \\/             \\/ \\/                \\/     \\/  \\/         \\/       \\/      \\/
-""")
+        yield TitleAscii()
 
 
 class ScriptButton(Static):
-    '''A class (like a template) for the script buttons'''
+    """A class (like a template) for the script buttons"""
 
     def __init__(self, powershell_command: str, button_name: str, hidden=False, **kwargs):
         super().__init__(**kwargs)
@@ -30,26 +31,43 @@ class ScriptButton(Static):
         self.powershell_command = powershell_command
         self.hidden = hidden
 
+    def build_ps_file(self) -> Path:
+        ps_script = f"""
+$modulePath = "{backend_dir}"
+
+Import-Module "$modulePath\\ob.psm1" -Force
+Import-Module "$modulePath\\dentalsoftware.psm1" -Force
+Import-Module "$modulePath\\fun.psm1" -Force
+
+{self.powershell_command}
+Start-Sleep -Seconds 3
+Exit
+""".strip()
+        """Create the $env:TEMP \\ obsoftware directory if it doesn't exist, then write the PowerShell script to a .ps1 file and return the file path."""
+        obsoftware_temp_dir = Path(tempfile.gettempdir()) / "obsoftware"
+        obsoftware_temp_dir.mkdir(exist_ok=True)
+        ps_file = obsoftware_temp_dir / "obtoolbox_runtime.ps1"
+        ps_file.write_text(ps_script, encoding="utf-8")
+        return ps_file
+
     @on(Button.Pressed)
     def set_command(self) -> None:
-        """When this button is pressed, tell the app which command to use."""
+        ps_file = self.build_ps_file()
+
         if not self.hidden:
-            self.app.current_command = f'Start-Process powershell.exe -ArgumentList "-NoExit", "-Command", \
-                "Import-Module \'$env:TEMP\\obsoftware\\ob.psm1\'; Import-Module \'$env:TEMP\\obsoftware\\dentalsoftware.psm1\';\
-                    {self.powershell_command}; Start-Sleep -Seconds 3; Exit"'
-        else:
-            # Launch the command in a detached, hidden PowerShell process so it runs in background.
-            # Import both modules inside the new process so the function is available in that runspace.
             self.app.current_command = (
-                f'Start-Process powershell.exe -WindowStyle Hidden -ArgumentList '
-                f'"-NoProfile", "-Command", "Import-Module \'$env:TEMP\\obsoftware\\ob.psm1\'; '
-                f'Import-Module \'$env:TEMP\\obsoftware\\dentalsoftware.psm1\'; {self.powershell_command}; Exit"'
+                f'Start-Process powershell.exe -ArgumentList "-NoProfile","-File","{ps_file}"'
             )
-        self.app.current_ps_command = f"{self.powershell_command}"
+        else:
+            self.app.current_command = (
+                f'Start-Process powershell.exe -WindowStyle Hidden -ArgumentList "-NoProfile","-File","{ps_file}"'
+            )
+
+        self.app.current_ps_command = self.powershell_command
         self.app.sub_title = f"Selected: {self.button_name}"
 
     def compose(self):
-        yield Button(f"{self.button_name}")
+        yield Button(self.button_name)
 
 
 class ESIOSSButton(Static):
@@ -64,18 +82,18 @@ class ESIOSSButton(Static):
         yield Button("ES IOSS Configuration")
 
 
-class OverBytesToolbox(App):
-    '''TUI for obtoolbox'''
+class ChimeraToolbox(App):
+    '''TUI for chimeratoolbox'''
     BINDINGS = [
         # (key, action_name, description),
         # omit the action_ prefix for the method
-        ("d", "toggle_dark", "Toggle Theme"),
+        # ("d", "toggle_dark", "Toggle Theme"),
         ("x", "execute_command", "Execute Command"),
         ("h", "main_section", "Home"),
         ("s", "dental_software_section", "Dental Software"),
         ("q", "exit_obtoolbox", "Exit")
     ]
-    CSS_PATH = "obtoolbox.tcss"
+    CSS_PATH = ".\\obtoolbox.tcss"
 
     def __init__(self, driver_class=None, css_path=None, watch_css=False, ansi_color=False):
         super().__init__(driver_class, css_path, watch_css, ansi_color)
@@ -86,7 +104,7 @@ class OverBytesToolbox(App):
     def compose(self):
         yield Header()
         yield Footer()
-        yield AsciiTitle()
+        yield Title()
         with Container(id="main-buttons"):
             with VerticalScroll(id="left-column"):
                 yield ScriptButton(button_name="Release & Renew IP",
@@ -100,7 +118,7 @@ class OverBytesToolbox(App):
                 yield ScriptButton(button_name="Run GPUpdate",
                                    powershell_command="Update-GroupPolicy")
                 yield ScriptButton(button_name="Flush and Register DNS",
-                                   powershell_command="Invoke-ReleaseRenew")
+                                   powershell_command="Invoke-DNSFlushRegister")
                 yield ScriptButton(button_name="Create Local Admin User",
                                    powershell_command="New-LocalAdmin")
                 yield ScriptButton(button_name="Enable PSRemoting",
@@ -113,14 +131,20 @@ class OverBytesToolbox(App):
                                    powershell_command="Unlock-FirewallAll")
                 yield ScriptButton(button_name="ChkDsk C:\\",
                                    powershell_command="Invoke-ChkdskC")
-                yield ScriptButton(button_name="Install C++ 2015-2022",
-                                   powershell_command="Get-CppRedist")
+                yield ScriptButton(button_name="Install C++ Redist 2005-v14 (Silent)",
+                                   powershell_command="Get-CppRedist",
+                                   hidden=True)
+                yield ScriptButton(button_name="Uninstall C++ Redist 2005-v14",
+                                   powershell_command="Uninstall-CppRedist")
             yield NerdCatAscii(classes="ascii-art")
             with VerticalScroll(id="right-column"):
                 yield ScriptButton(button_name="Run CLI Net Scan",
                                    powershell_command="Invoke-NetScan")
                 yield ScriptButton(button_name="Advanced IP Scanner",
                                    powershell_command="Get-IPScanner",
+                                   hidden=True)
+                yield ScriptButton(button_name="USB Tree View",
+                                   powershell_command="Invoke-USBTreeView",
                                    hidden=True)
                 yield ScriptButton(button_name="WizTree",
                                    powershell_command="Invoke-WizTree",
@@ -141,6 +165,12 @@ class OverBytesToolbox(App):
                                    powershell_command="Invoke-OfficeInstall")
                 yield ScriptButton(button_name="Hold Music",
                                    powershell_command="Invoke-HoldMusicSection")
+                yield ScriptButton(button_name="Battleship",
+                                   powershell_command="Invoke-Battleship",
+                                   hidden=False)
+                yield ScriptButton(button_name="LibreMines",
+                                   powershell_command="Get-LibreMines",
+                                   hidden=True)
         with Container(id="dental-buttons",
                        classes="hidden"):
             with VerticalScroll(id="left-column"):
@@ -201,10 +231,16 @@ class OverBytesToolbox(App):
                                    powershell_command="Install-CDRPatch")
                 yield ScriptButton(button_name="7. Schick Sensor Integration for OPs",
                                    powershell_command="Install-ESSchickSensorIntegration")
+            with VerticalScroll(id="right-column"):
+                yield Static("If the office uses AE Schick Remotes")
+                yield ScriptButton(button_name="Install AE Support for CDR",
+                                   powershell_command="Install-AEUSBInterface",
+                                   hidden=True)
             yield ChonkCatAscii(classes="ascii-art")
 
     def on_mount(self):
         ''' Things to run in preperation of the script '''
+        self.theme = "rose-pine"
 
     def action_execute_command(self) -> None:
         """Runs the currently selected command when 'x' is pressed."""
@@ -237,10 +273,21 @@ class OverBytesToolbox(App):
                 grid.add_class("hidden")
         self.sub_title = subtitle
 
+def deleteOBSoftwareTempFiles():
+    """Deletes temp obsoftware and all its contents recursively."""
+    obsoftware_temp_dir = Path(tempfile.gettempdir()) / "obsoftware"
+
+    if obsoftware_temp_dir.exists():
+        try:
+            shutil.rmtree(obsoftware_temp_dir)
+        except Exception as e:
+            print(f"Error deleting {obsoftware_temp_dir}: {e}")
+# Register the cleanup function to run when the program exits
+atexit.register(deleteOBSoftwareTempFiles)
 
 def main():
     """The main executive when importing into other python files"""
-    OverBytesToolbox().run()
+    ChimeraToolbox().run()
 
 
 if __name__ == '__main__':

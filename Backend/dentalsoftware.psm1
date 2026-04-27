@@ -159,9 +159,7 @@ Function Invoke-SmartDocScannerFix {
     [CmdletBinding()]
     param()
     Start-Process "cmd.exe" -ArgumentList "/c", '"C:\Eaglesoft\Shared Files\setupdocmgr64.bat"' -WorkingDirectory "C:\Eaglesoft\Shared Files"
-    Write-Host "Remember to set the scanner to the corresponding WIA-Printer in"
-    Write-Host "Eaglesoft > File > Preferences > X-Ray Tab > Scanner" -ForegroundColor DarkCyan
-    Read-Host "Press Enter to dismiss"
+    exit
 }
 Function Install-MouthwatchDrivers {
     [CmdletBinding()]
@@ -311,16 +309,16 @@ Function Optimize-IOSSService {
     Start-Process -FilePath "sc.exe" -ArgumentList 'failure', 'SironaUSBService', 'reset=', '0', 'actions=', 'restart/5000/restart/5000/restart/5000' -NoNewWindow -Wait
     Write-Host "Set to restart service on failure"
 
-    try {
-        Write-Host "Setting StartupType to Automatic (Delayed)"
-        Set-Service -Name SironaUSBService -StartupType AutomaticDelayed -ErrorAction Stop
-        Write-Host "IOSS Service set to Automatic (Delayed) startup" -ForegroundColor Green
-    }
-    catch {
-        Write-Error "Unable to set service `"Sirona Intraoral Sensor Software`" StartupType to `"Automatic Delayed.`" Please do so manually."
-        Write-Error "$_"
-        Pause
-    }
+    #try {
+    #    Write-Host "Setting StartupType to Automatic (Delayed)"
+    #    Set-Service -Name SironaUSBService -StartupType AutomaticDelayed -ErrorAction Stop
+    #    Write-Host "IOSS Service set to Automatic (Delayed) startup" -ForegroundColor Green
+    #}
+    #catch {
+    #    Write-Error "Unable to set service `"Sirona Intraoral Sensor Software`" StartupType to `"Automatic Delayed.`" Please do so manually."
+    #    Write-Error "$_"
+    #    Pause
+    #}
     try {
         Write-Host "Restarting IOSS Service"
         Restart-Service -Name SironaUSBService -ErrorAction Stop

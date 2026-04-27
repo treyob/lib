@@ -1,4 +1,4 @@
-OverBytesToolbox {
+ChimeraToolbox {
     ScriptButton {
         width: 100%;
     }
@@ -7,9 +7,9 @@ OverBytesToolbox {
         margin: 0;
     }
 }
-OverBytesToolbox Container {
+ChimeraToolbox Container {
     layout: grid;
-    background: $boost;
+    background: $background;
     padding: 2;
     align: center middle;
 }
@@ -31,7 +31,7 @@ OverBytesToolbox Container {
 .ascii-art {
     width: 100%;
     content-align: center middle;
-    color: cyan;
+    color: $primary;
     layer: below;
 }
 
@@ -40,10 +40,11 @@ OverBytesToolbox Container {
 }
 
 
-AsciiTitle {
+Title {
     content-align: center middle;
     background: $boost;
-    margin: 0 0 1 0;
+    margin: 0 0 0 0;
+    padding: -1 0 0 0;
     min-width: 100;
     Static {
         content-align: center middle;

@@ -345,26 +345,148 @@ Function Invoke-chkdskC {
     Read-Host     
 }
 # Download C++ Redistributables
-Function Get-CppRedist {
-    # Function to download and execute the redistributable installer
-    function Install-Redistributable {
-        param ($FileName, $Url)
-        $filePath = "C:\$FileName"
-        Invoke-WebRequest $Url -OutFile $filePath
-        Write-Host "Running $FileName installer..." -ForegroundColor Magenta
-        Start-Process $filePath
+function Get-CppRedist {
+
+    function Get-Installers {
+        param (
+            [string]$FileName,
+            [string]$Url
+        )
+        $tempDir = "$env:TEMP\obsoftware\cpp_redists"
+        $filePath = Join-Path $tempDir $FileName
+
+        if (-Not (Test-Path $tempDir)) {
+            New-Item -ItemType Directory -Path $tempDir | Out-Null
+        }
+
+        if (-Not (Test-Path $filePath)) {
+            Write-Host "Downloading $FileName..." -ForegroundColor Cyan
+            Start-BitsTransfer -Source $Url -Destination $filePath
+        } else {
+            Write-Host "$FileName already exists, skipping download." -ForegroundColor Gray
+        }
+
+        return $filePath
     }
-    # Install both x64 and x86 C++ redistributables
-    Install-Redistributable "c++.exe" "https://aka.ms/vs/17/release/vc_redist.x64.exe"
-    Install-Redistributable "c++x86.exe" "https://aka.ms/vs/17/release/vc_redist.x86.exe"
-    Write-Host "Press Enter to go back (this will delete the app, make sure it's closed)" -ForegroundColor Magenta
-    Read-Host
-    Remove-Item C:\c++* -Force
+
+    function Install-Installer {
+        param (
+            [string]$FilePath,
+            [switch]$Quiet,
+            [switch]$Wait,
+            [switch]$Is2005
+        )
+
+        Write-Host "Installing $($FilePath)..." -ForegroundColor Magenta
+
+        if ($Is2005) {
+            $args = @("/q")  # Only /q for 2005
+        } else {
+            $args = @("/s", "/norestart")
+            if ($Quiet) { $args += "/q" }
+        }
+
+        if ($Wait) {
+            Start-Process $FilePath -ArgumentList $args -Wait
+            return $null
+        } else {
+            return Start-Process $FilePath -ArgumentList $args -PassThru
+        }
+    }
+
+    # ---- ALL DOWNLOADS FIRST ----
+    $downloads = @{}
+
+    # Blocking installers
+    $downloads["vcredist2010_x64.exe"] = "https://download.microsoft.com/download/1/6/5/165255E7-1014-4D0A-B094-B6A430A6BFFC/vcredist_x64.exe"
+    $downloads["vcredist2010_x86.exe"] = "https://download.microsoft.com/download/1/6/5/165255E7-1014-4D0A-B094-B6A430A6BFFC/vcredist_x86.exe"
+    $downloads["vc_redist2008_x86.exe"] = "https://download.microsoft.com/download/5/D/8/5D8C65CB-C849-4025-8E95-C3966CAFD8AE/vcredist_x86.exe"
+    $downloads["vc_redist2008_x64.exe"] = "https://download.microsoft.com/download/5/D/8/5D8C65CB-C849-4025-8E95-C3966CAFD8AE/vcredist_x64.exe"
+    $downloads["vcredist2005_x86.exe"] = "https://download.microsoft.com/download/8/b/4/8b42259f-5d70-43f4-ac2e-4b208fd8d66a/vcredist_x86.EXE"
+    $downloads["vcredist2005_x64.exe"] = "https://download.microsoft.com/download/8/b/4/8b42259f-5d70-43f4-ac2e-4b208fd8d66a/vcredist_x64.EXE"
+
+    # Parallel installers
+    $downloads["vc_redistv14.x86.exe"] = "https://aka.ms/vc14/vc_redist.x86.exe"
+    $downloads["vc_redistv14.x64.exe"] = "https://aka.ms/vc14/vc_redist.x64.exe"
+    $downloads["highdpimfc2013x86enu.exe"] = "https://aka.ms/highdpimfc2013x86enu"
+    $downloads["highdpimfc2013x64enu.exe"] = "https://aka.ms/highdpimfc2013x64enu"
+    $downloads["vc_redistv2012_x86.exe"] = "https://download.microsoft.com/download/1/6/B/16B06F60-3B20-4FF2-B699-5E9B7962F9AE/VSU_4/vcredist_x86.exe"
+    $downloads["vc_redistv2012_x64.exe"] = "https://download.microsoft.com/download/1/6/B/16B06F60-3B20-4FF2-B699-5E9B7962F9AE/VSU_4/vcredist_x64.exe"
+
+    $downloadedFiles = @{}
+    foreach ($file in $downloads.Keys) {
+        $downloadedFiles[$file] = Get-Installers -FileName $file -Url $downloads[$file]
+    }
+
+    # ---- STEP 1: Blocking installs ----
+    Install-Installer $downloadedFiles["vcredist2010_x64.exe"] -Quiet -Wait
+    Install-Installer $downloadedFiles["vcredist2010_x86.exe"] -Quiet -Wait
+    Install-Installer $downloadedFiles["vc_redist2008_x86.exe"] -Quiet -Wait
+    Install-Installer $downloadedFiles["vc_redist2008_x64.exe"] -Quiet -Wait
+    Install-Installer $downloadedFiles["vcredist2005_x86.exe"] -Is2005 -Wait
+    Install-Installer $downloadedFiles["vcredist2005_x64.exe"] -Is2005 -Wait
+
+    # ---- STEP 2: Parallel installs ----
+    $processes = @()
+    $parallelKeys = @(
+        "vc_redistv14.x86.exe",
+        "vc_redistv14.x64.exe",
+        "highdpimfc2013x86enu.exe",
+        "highdpimfc2013x64enu.exe",
+        "vc_redistv2012_x86.exe",
+        "vc_redistv2012_x64.exe"
+    )
+
+    foreach ($key in $parallelKeys) {
+        $processes += Install-Installer $downloadedFiles[$key]
+    }
+
+    # ---- STEP 3: Wait for parallel installs ----
+    Write-Host "Waiting for remaining installers to complete..." -ForegroundColor Yellow
+    foreach ($proc in $processes) {
+        if ($proc) {
+            try { $proc.WaitForExit() } catch { Write-Warning "Failed waiting for process $($proc.Id)" }
+        }
+    }
+
+    Write-Host "All installations completed." -ForegroundColor Green
+
 }
+
+# Uninstall C++ Redistributables
+Function Uninstall-CppRedist {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+    $moduleName = "VcRedist"
+
+    # Check if module is installed
+    if (-not (Get-Module -ListAvailable -Name $moduleName)) {
+        Write-Host "$moduleName module not found. Installing..."
+
+        try {
+            Install-Module -Name $moduleName -Repository PSGallery -Scope CurrentUser -Force -ErrorAction Stop
+            Write-Host "$moduleName installed successfully."
+        }
+        catch {
+            Write-Error "Failed to install $moduleName. $_"
+            exit 1
+        }
+    }
+    else {
+        Write-Host "$moduleName module already installed."
+    }
+
+    # Import the module
+    Import-Module $moduleName -ErrorAction Stop
+
+    # Run uninstall (will prompt for confirmation)
+    Uninstall-VcRedist -Confirm:$true
+}
+
 # Run Advanced IP Scanner
 Function Get-IPScanner {
     $zipUrl = "https://obtoolbox-public.s3.us-east-2.amazonaws.com/3rd-party-tools/ipscanner.zip"
-    $targetDir = "C:\ipscanner"
+    $targetDir = "$env:ProgramFiles\Advanced IP Scanner"
     Clear-Host; Write-Host "Downloading Advanced IP Scanner"
     Start-BitsTransfer -Source $zipUrl -Destination "$env:TEMP\obsoftware\ipscanner.zip"
     Clear-Host; Write-Host "Extracting Advanced IP Scanner"
@@ -686,8 +808,8 @@ Enter the number of your choice
 }
 # Download, extract, and run wiztree
 Function Invoke-WizTree {
-    $zipUrl = "https://www.diskanalyzer.com/files/wiztree_4_24_portable.zip"
-    $targetDir = "C:\WizTree"
+    $zipUrl = "https://antibodysoftware-17031.kxcdn.com/files/wiztree_4_31_portable.zip"
+    $targetDir = "$env:TEMP\obsoftware\WizTree"
     Clear-Host; Write-Host "Downloading WizTree"
     #Invoke-WebRequest -Uri $zipUrl -OutFile "$env:TEMP\wiztree.zip"
     Start-BitsTransfer -Source $zipUrl -Destination "$env:TEMP\wiztree.zip"
@@ -695,16 +817,10 @@ Function Invoke-WizTree {
     Expand-Archive -Path "$env:TEMP\wiztree.zip" -DestinationPath $targetDir
     Clear-Host; Write-Host "Running WizTree."
     Start-Process -FilePath "$targetDir\WizTree64.exe" -Verb RunAs
-    Clear-Host; Invoke-PounceCat "WizTree should now be running." "This screen will exit when you close WizTree."
-    do {
-        $process = Get-Process -Name "WizTree64" -ErrorAction SilentlyContinue
-        Start-Sleep -Seconds 1
-    } while ($process)
-    Remove-Item -Recurse -Force $targetDir, "$env:TEMP\wiztree.zip"
 }
 Function Invoke-HWInfo {
     $zipUrl = "https://cytranet-dal.dl.sourceforge.net/project/hwinfo/Windows_Portable/hwi_820.zip?viasf=1"
-    $targetDir = "C:\HWInfo"
+    $targetDir = "$env:TEMP\obsoftware\HWInfo"
     
     Clear-Host; Write-Host "Downloading hwinfo"
     #Invoke-WebRequest -Uri $zipUrl -OutFile "$env:TEMP\hwinfo.zip"
@@ -722,51 +838,40 @@ AutoUpdateBetaDisable=1
 AutoUpdate=0
 "@
     Set-Content -Path "$targetDir\HWiNFO64.INI" -Value $iniContent -Encoding ASCII
-
     Clear-Host; Write-Host "Running hwinfo."
     Start-Process -FilePath "$targetDir\hwinfo64.exe" -Verb RunAs
-    
-    Clear-Host; Invoke-PounceCat "hwinfo should now be running." "This screen will exit when you close hwinfo."
-    
-    do {
-        $process = Get-Process -Name "hwinfo64" -ErrorAction SilentlyContinue
-        Start-Sleep -Seconds 1
-    } while ($process)
-    
-    Remove-Item -Recurse -Force $targetDir, "$env:TEMP\hwinfo.zip"
 }
 
 # Dot Net Repair Tool
 Function Invoke-DotNetRepair {
     $installUrl = "https://obtoolbox-public.s3.us-east-2.amazonaws.com/3rd-party-tools/NetFxRepairTool.exe"
-    $targetDir = "C:\DotNetRepair"
+    $targetDir = "$env:TEMP\obsoftware\DotNetRepair"
     Clear-Host; Write-Host "Installing and Starting .Net Repair Tool"
     if (-Not (Test-Path -Path $targetDir)) { New-Item -ItemType Directory -Path $targetDir -Force | Out-Null }
     Invoke-WebRequest -Uri $installUrl -OutFile "$targetDir\NetFxRepairTool.exe"
     Clear-Host; Write-Host "Running .Net Repair Tool."
     Start-Process -FilePath "$targetDir\NetFxRepairTool.exe" -Verb RunAs
-    Clear-Host; Invoke-UltraCat ".Net Repair Tool should now be running." "This screen will exit when you close the tool."
-    do {
-        $process = Get-Process -Name "NetFxRepairTool" -ErrorAction SilentlyContinue
-        Start-Sleep -Seconds 1
-    } while ($process)
-    Remove-Item -Recurse -Force $targetDir
 }
+
+Function Install-AEUSBInterface {
+    $installUrl = "https://obtoolbox-public.s3.us-east-2.amazonaws.com/3rd-party-tools/AEUSBInterfaceSetup.exe"
+    $targetDir = "$env:temp\obsoftware\AEUSBInterfaceSetup"
+    Clear-Host; Write-Host "Installing and Starting AE USB Interface Setup"
+    if (-Not (Test-Path -Path $targetDir)) { New-Item -ItemType Directory -Path $targetDir -Force | Out-Null }
+    Start-BitsTransfer -Source $installUrl -Destination "$targetDir\AEUSBInterfaceSetup.exe"
+    Clear-Host; Write-Host "Running AE USB Interface Setup"
+    Start-Process -FilePath "$targetDir\AEUSBInterfaceSetup.exe" -Verb RunAs
+}
+
+
 Function Invoke-TDOXDRW11Fix {
     $installUrl = "https://obtoolbox-public.s3.us-east-2.amazonaws.com/3rd-party-tools/TDOXDRWin11Fix.exe"
-    $targetDir = "C:\TDOXDRWin11Fix"
-    Clear-Host; Write-Host "Installing and Starting .Net Repair Tool"
+    $targetDir = "$env:TEMP\obsoftware\TDOXDRWin11Fix"
+    Clear-Host; Write-Host "Running TDOXDR Win11 Fix"
     if (-Not (Test-Path -Path $targetDir)) { New-Item -ItemType Directory -Path $targetDir -Force | Out-Null }
     Start-BitsTransfer -Source $installUrl -Destination "$targetDir\TDOXDRWin11Fix.exe"
     Clear-Host; Write-Host "Downloading the script"
     Start-Process -FilePath "$targetDir\TDOXDRWin11Fix.exe" -Verb RunAs
-    Clear-Host; Invoke-UltraCat "The fix should now be running." "This screen will exit when you close the installer."
-    Start-Sleep -Seconds 2
-    do {
-        $process = Get-Process -Name "TDOXDRWin11Fix" -ErrorAction SilentlyContinue
-        Start-Sleep -Seconds 1
-    } while ($process)
-    Remove-Item -Recurse -Force $targetDir
 }
 Function Invoke-NetScan {
     Clear-Host
@@ -825,44 +930,43 @@ Function Invoke-TeamViewerQS {
     Start-BitsTransfer -Source $installUrl -Destination "$targetDir\TeamviewerQS.exe"
     Clear-Host; Write-Host "Running TeamViewer"
     Start-Process -FilePath "$targetDir\TeamViewerQS.exe" -Verb RunAs
-    Clear-Host; Invoke-PounceCat "TeamViewer should now be running."
+}
+
+Function Invoke-USBTreeView {
+    $installUrl = "https://obtoolbox-public.s3.us-east-2.amazonaws.com/3rd-party-tools/UsbTreeView.exe"
+    $targetDir = "$env:temp\obsoftware\USBTreeView"
+    Clear-Host; Write-Host "Downloading and Starting USB Tree View"
+    if (-Not (Test-Path -Path $targetDir)) { New-Item -ItemType Directory -Path $targetDir -Force | Out-Null}
+    Start-BitsTransfer -Source $installUrl -Destination "$targetDir\UsbTreeView.exe"
+    Clear-Host; Write-Host "Running USB Tree View"
+    Start-Process -FilePath "$targetDir\UsbTreeView.exe" -Verb RunAs
+    Clear-Host; Invoke-PounceCat "USB Tree View should now be running."
     do {
-        $process = Get-Process | Get-Process | Where-Object { $_.Name -like "TeamViewer*" }
+        $process = Get-Process | Get-Process | Where-Object { $_.Name -like "UsbTreeView*" }
         Start-Sleep -Seconds 1
     } while ($process)
     Remove-Item -Recurse -Force $targetDir
 }
 
+
 Function Invoke-NewTeamViewerQS {
     $installUrl = "https://www.teamviewer.com/link/?url=505374"
-    $targetDir = "C:\TeamViewerQS"
+    $targetDir = "$env:TEMP\obsoftware\TeamViewerQS"
     Clear-Host; Write-Host "Downloading and Starting TeamViewer"
     if (-Not (Test-Path -Path $targetDir)) { New-Item -ItemType Directory -Path $targetDir -Force | Out-Null }
     Start-BitsTransfer -Source $installUrl -Destination "$targetDir\TeamViewerQS.exe"
     Clear-Host; Write-Host "Running TeamViewer"
     Start-Process -FilePath "$targetDir\TeamViewerQS.exe" -Verb RunAs
-    Clear-Host; Invoke-PounceCat "TeamViewer should now be running."
-    do {
-        $process = Get-Process | Get-Process | Where-Object { $_.Name -like "TeamViewer*" }
-        Start-Sleep -Seconds 1
-    } while ($process)
-    Remove-Item -Recurse -Force $targetDir
 }
 
 Function Invoke-DentrixInstallMigrateTool {
     $installUrl = "https://dentrix.com/support/core/MigrationAndInstallTool.exe"
-    $targetDir = "C:\DentrixInstallMigrateTool"
+    $targetDir = "$env:TEMP\obsoftware\DentrixInstallMigrateTool"
     Clear-Host; Write-Host "Downloading and Starting Dentrix Installation and Migration tool"
     if (-Not (Test-Path -Path $targetDir)) { New-Item -ItemType Directory -Path $targetDir -Force | Out-Null }
     Start-BitsTransfer -Source $installUrl -Destination "$targetDir\DentrixInstallMigrateTool.exe"
     Clear-Host; Write-Host "Running the tool"
     Start-Process -FilePath "$targetDir\DentrixInstallMigrateTool.exe" -Verb RunAs
-    Clear-Host; Invoke-PounceCat "Dentrix Installation and Migration tool should now be running."
-    do {
-        $process = Get-Process | Get-Process | Where-Object { $_.Name -like "DentrixInstallMigrateTool" }
-        Start-Sleep -Seconds 1
-    } while ($process)
-    Remove-Item -Recurse -Force $targetDir
 }
 
 Function Invoke-RevoUninstaller {
@@ -906,29 +1010,80 @@ Function Stop-HoldMusic {
         $global:sound = $null
     }
 }
+function Get-IniContent {
+    param ([string]$Path)
+
+    $ini = [ordered]@{}   
+    $section = $null
+
+    foreach ($line in Get-Content $Path) {
+        $line = $line.Trim()
+
+        if (-not $line -or $line.StartsWith(";")) { continue }
+
+        if ($line -match "^\[(.+)\]$") {
+            $section = $matches[1]
+            $ini[$section] = [ordered]@{}  
+            continue
+        }
+
+        if ($line -match "^(.*?)=(.*)$" -and $section) {
+            $key = $matches[1].Trim()
+            $value = $matches[2].Trim()
+            $ini[$section][$key] = $value
+        }
+    }
+
+    return $ini
+}
 function Invoke-HoldMusicSection {
     param ()
+    if (-Not (Test-Path "$env:temp\obsoftware\music.ini")) 
+        {Invoke-WebRequest -Uri "https://obtoolbox-public.s3.us-east-2.amazonaws.com/hold-music/music.ini" -OutFile "$env:temp\obsoftware\music.ini"}
+    $ini = Get-IniContent -Path "$env:temp\obsoftware\music.ini"
     do {
         Clear-Host
         Write-Host "Hold Music Section`n" -ForegroundColor DarkCyan
-        $holdMusicTable = @(
-            [PSCustomObject]@{ Option = '1. Other'; Song = 'Opus No. 1 - Tim Carleton' }
-            [PSCustomObject]@{ Option = '2. Dexis'; Song = '12 Spanish Dances in G Major Arr. for Guitar' }
-            [PSCustomObject]@{ Option = '3. Comcast'; Song = 'Winelight - Grover Washington' }
-            [PSCustomObject]@{ Option = '4. Stop Music' }
-        )
-        $holdMusicTable | Format-Table -AutoSize
 
-        switch ($musicChoice) {
-            "1" { Start-HoldMusic -link 'https://obtoolbox-public.s3.us-east-2.amazonaws.com/hold-music/opus.no.1.wav' -songName 'Opus No. 1 - Tim Carleton' }
-            "2" { Start-HoldMusic -link 'https://obtoolbox-public.s3.us-east-2.amazonaws.com/hold-music/12.span.dance.wav' -songName '12 Spanish Dances in G Major Arr. for Guitar' }
-            "3" { Start-HoldMusic -link 'https://obtoolbox-public.s3.us-east-2.amazonaws.com/hold-music/Winelight+(152kbit_Opus).wav' -songName 'Winelight - Grover Washington' }
-            "4" { Stop-HoldMusic }
+        $menu = @()
+        $index = 1
+        $map = @{}
+
+        foreach ($section in $ini.Keys) {
+            $menu += [PSCustomObject]@{
+                Option = "$index."
+                Song   = $ini[$section]["Name"]
+            }
+            $map[$index] = $section
+            $index++
         }
-        $musicChoice = Read-Host "Enter the number of your choice, or press enter to exit"
-    } while ($musicChoice -ne "")
-}
 
+        $menu += [PSCustomObject]@{
+            Option = "X."
+            Song   = "Stop Music"
+        }
+
+        $menu | Format-Table -AutoSize
+
+        $choice = Read-Host "Enter choice (or press Enter to exit)"
+
+        if ($choice -eq "") { break }
+
+        if ($choice -eq "X") {
+            Stop-HoldMusic
+            continue
+        }
+
+        if ($map.ContainsKey([int]$choice)) {
+            $section = $map[[int]$choice]
+            $songName = $ini[$section]["Name"]
+            $link = $ini[$section]["Url"]
+
+            Start-HoldMusic -link $link -songName $songName
+        }
+
+    } while ($true)
+}
 Function Open-ExternalLink {
     [CmdletBinding()]
     param(
