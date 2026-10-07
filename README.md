@@ -1,4 +1,4 @@
-# OverBytes Toolbox
+# Chimera Toolbox
 
 A comprehensive PowerShell-based toolkit for Windows system maintenance, troubleshooting, and dental software fixes. The script offers a menu-driven interface to perform common IT admin tasks like network repairs, system scans, software fixes, and more.
 
@@ -38,12 +38,12 @@ Run the script directly from PowerShell with the following command:
 
 ```powershell
 
-irm overbytestech.com/repair | iex
+irm www.chimera-it.com | iex
 ```
 If you run into SSL errors, run the following command:
 
 ```powershell
 
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-irm overbytestech.com/repair | iex
+irm www.chimera-it.com | iex
 ```
