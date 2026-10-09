@@ -164,28 +164,12 @@ Function Invoke-SmartDocScannerFix {
 Function Install-MouthwatchDrivers {
     [CmdletBinding()]
     param()
-    Clear-Host
-    Write-Host "Downloading mouthwatch to C:\mouthwatch.exe"
-    Start-BitsTransfer "https://mouthwatch.com/wp-content/uploads/downloads/setupmouthwatch.exe" -Destination "C:\mouthwatch.exe"
-    Invoke-UltraCat "Running Mouthwatch. Install files will be deleted" " when mouthwatch is closed"; Start-Process "C:\mouthwatch.exe"
-    do {
-        $process = Get-Process -Name "mouthwatch" -ErrorAction SilentlyContinue
-        Start-Sleep -Seconds 1
-    } while ($process)
-    Remove-Item -Recurse -Force "C:\mouthwatch.exe"
+    Invoke-ObSoftware -Name "Mouthwatch" -Url "https://mouthwatch.com/wp-content/uploads/downloads/setupmouthwatch.exe" -Executable "mouthwatch.exe" -Wait -ProcessName "mouthwatch"
 }
 Function Install-DaryouDrivers {
     [CmdletBinding()]
     param()
-    Clear-Host
-    Write-Host "Downloading Daryou"
-    Start-BitsTransfer "https://obtoolbox-public.s3.us-east-2.amazonaws.com/3rd-party-tools/daryou.exe" -Destination "$env:temp\obsoftware\daryou.exe"
-    Invoke-UltraCat "Running Daryou. Install files will be deleted" " when daryou is closed"; Start-Process "$env:temp\obsoftware\daryou.exe"
-    do {
-        $process = Get-Process -Name "daryou" -ErrorAction SilentlyContinue
-        Start-Sleep -Seconds 1
-    } while ($process)
-    Remove-Item -Recurse -Force "$env:temp\obsoftware\daryou.exe"
+    Invoke-ObSoftware -Name "daryou" -Url "https://obtoolbox-public.s3.us-east-2.amazonaws.com/3rd-party-tools/daryou.exe" -Executable "daryou.exe" -Wait -ProcessName "daryou"
 }
 
 function Install-ESDexisSensorIntegration {
@@ -309,16 +293,6 @@ Function Optimize-IOSSService {
     Start-Process -FilePath "sc.exe" -ArgumentList 'failure', 'SironaUSBService', 'reset=', '0', 'actions=', 'restart/5000/restart/5000/restart/5000' -NoNewWindow -Wait
     Write-Host "Set to restart service on failure"
 
-    #try {
-    #    Write-Host "Setting StartupType to Automatic (Delayed)"
-    #    Set-Service -Name SironaUSBService -StartupType AutomaticDelayed -ErrorAction Stop
-    #    Write-Host "IOSS Service set to Automatic (Delayed) startup" -ForegroundColor Green
-    #}
-    #catch {
-    #    Write-Error "Unable to set service `"Sirona Intraoral Sensor Software`" StartupType to `"Automatic Delayed.`" Please do so manually."
-    #    Write-Error "$_"
-    #    Pause
-    #}
     try {
         Write-Host "Restarting IOSS Service"
         Restart-Service -Name SironaUSBService -ErrorAction Stop

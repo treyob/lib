@@ -1,5 +1,6 @@
 ''' TUI for Chimera Toolbox '''
 import subprocess
+import sys
 from textual import on
 from textual.app import App
 from textual.containers import Container, VerticalScroll
@@ -10,10 +11,32 @@ import atexit
 import tempfile
 import shutil
 
-# Importing powershell modules
+
+def is_frozen():
+    """True when running as a compiled executable.
+
+    PyInstaller sets sys.frozen, but Nuitka (what this project compiles
+    with) never does - it injects a module-level __compiled__ marker into
+    every compiled module instead. Checking only sys.frozen means this
+    always evaluates to "running from source", even inside the .exe.
+    """
+    return getattr(sys, "frozen", False) or "__compiled__" in globals()
+
+
+# Importing powershell modules.
+# When frozen (compiled with Nuitka), ob.psm1/dentalsoftware.psm1/fun.psm1
+# are copied next to the exe under a "backend" folder (see
+# "build/compile obtoolbox.ps1"). When running from source, they live in
+# their normal repo location instead. Detect which case we're actually in
+# rather than relying on a manually-flipped flag, so running from source
+# doesn't silently look for the modules in the wrong place.
 script_dir = Path(__file__).resolve().parent
-backend_dir = script_dir.parent / "Backend"
+if is_frozen():
+    backend_dir = script_dir / "backend"
+else:
+    backend_dir = script_dir.parent / "backend" / "modules"
 # End of powershell module import
+
 
 class Title(Static):
     '''The title in ascii'''
@@ -134,8 +157,9 @@ class ChimeraToolbox(App):
                 yield ScriptButton(button_name="Install C++ Redist 2005-v14 (Silent)",
                                    powershell_command="Get-CppRedist",
                                    hidden=True)
-                yield ScriptButton(button_name="Uninstall C++ Redist 2005-v14",
-                                   powershell_command="Uninstall-CppRedist")
+                yield ScriptButton(button_name="Reinstall Microsoft Print to PDF",
+                                   powershell_command="Reset-PrintToPDF",
+                                   hidden=True)
             yield NerdCatAscii(classes="ascii-art")
             with VerticalScroll(id="right-column"):
                 yield ScriptButton(button_name="Run CLI Net Scan",
@@ -236,6 +260,7 @@ class ChimeraToolbox(App):
                 yield ScriptButton(button_name="Install AE Support for CDR",
                                    powershell_command="Install-AEUSBInterface",
                                    hidden=True)
+                yield Static("Restart is required for AE Support for CDR")
             yield ChonkCatAscii(classes="ascii-art")
 
     def on_mount(self):
@@ -273,6 +298,7 @@ class ChimeraToolbox(App):
                 grid.add_class("hidden")
         self.sub_title = subtitle
 
+
 def deleteOBSoftwareTempFiles():
     """Deletes temp obsoftware and all its contents recursively."""
     obsoftware_temp_dir = Path(tempfile.gettempdir()) / "obsoftware"
@@ -282,8 +308,11 @@ def deleteOBSoftwareTempFiles():
             shutil.rmtree(obsoftware_temp_dir)
         except Exception as e:
             print(f"Error deleting {obsoftware_temp_dir}: {e}")
+
+
 # Register the cleanup function to run when the program exits
 atexit.register(deleteOBSoftwareTempFiles)
+
 
 def main():
     """The main executive when importing into other python files"""

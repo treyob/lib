@@ -469,7 +469,5 @@ try {
 }
 
 Function Get-LibreMines {
-    Start-BitsTransfer -Source "https://github.com/Bollos00/LibreMines/releases/download/v2.3.0/libremines-v2.3.0-windows-qt6.zip" -Destination "$env:TEMP\obsoftware\LibreMines.zip"
-    Expand-Archive -Path "$env:TEMP\obsoftware\LibreMines.zip" -DestinationPath "$env:TEMP\obsoftware\LibreMines" -Force
-    Start-Process -FilePath "$env:TEMP\obsoftware\LibreMines\libremines\libremines.exe"
+    Invoke-ObSoftware -Name "LibreMines" -Url "https://github.com/Bollos00/LibreMines/releases/download/v2.3.0/libremines-v2.3.0-windows-qt6.zip" -Executable "libremines\libremines.exe" -Zip
 }

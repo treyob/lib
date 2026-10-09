@@ -253,7 +253,6 @@ Function Invoke-ReleaseRenew {
     ipconfig /release
     ipconfig /renew
     Write-Host "Operation completed. Press Enter to continue." -ForegroundColor Magenta
-    Read-Host
 }
 # Windows repair. Runs sfc and repair-windowsimage (DISM)
 Function Invoke-WindowsRepair {
@@ -485,20 +484,7 @@ Function Uninstall-CppRedist {
 
 # Run Advanced IP Scanner
 Function Get-IPScanner {
-    $zipUrl = "https://obtoolbox-public.s3.us-east-2.amazonaws.com/3rd-party-tools/ipscanner.zip"
-    $targetDir = "$env:ProgramFiles\Advanced IP Scanner"
-    Clear-Host; Write-Host "Downloading Advanced IP Scanner"
-    Start-BitsTransfer -Source $zipUrl -Destination "$env:TEMP\obsoftware\ipscanner.zip"
-    Clear-Host; Write-Host "Extracting Advanced IP Scanner"
-    Expand-Archive -Path "$env:TEMP\obsoftware\ipscanner.zip" -DestinationPath $targetDir -Force
-    Clear-Host; Write-Host "Running ipscanner"
-    Start-Process -FilePath "$targetDir\Advanced_IP_Scanner_2.5.4594.1.exe" -Verb RunAs
-    Clear-Host; Invoke-PounceCat "Advanced IP scanner should now be running." "This screen will exit when you close it."
-    do {
-        $process = Get-Process -Name "Advanced_IP_Scanner_2.5.4594.1" -ErrorAction SilentlyContinue
-        Start-Sleep -Seconds 1
-    } while ($process)
-    Remove-Item -Recurse -Force $targetDir, "$env:TEMP\obsoftware\ipscanner.zip"
+    Invoke-ObSoftware -Name "ipscanner" -Url "https://obtoolbox-public.s3.us-east-2.amazonaws.com/3rd-party-tools/ipscanner.zip" -Executable "Advanced_IP_Scanner_2.5.4594.1.exe" -Zip -RunAs -Wait -ProcessName "Advanced_IP_Scanner_2.5.4594.1"
 }
 # This function can determine the state of Bitlocker
 Function Get-BitlockerStatus {
@@ -730,6 +716,105 @@ Function Invoke-UltraCat {
 "@ -ForegroundColor Magenta
 }
 
+# ---------------------------------------------------------------------------
+# Reusable download helper. Tries BITS first (fast, resumable) and falls back
+# to Invoke-WebRequest so a button still works if the BITS service is disabled.
+# ---------------------------------------------------------------------------
+Function Invoke-ObDownload {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$Source,
+        [Parameter(Mandatory)][string]$Destination
+    )
+    $parent = Split-Path -Parent $Destination
+    if ($parent -and -not (Test-Path -LiteralPath $parent)) {
+        New-Item -ItemType Directory -Path $parent -Force | Out-Null
+    }
+    try {
+        Start-BitsTransfer -Source $Source -Destination $Destination -ErrorAction Stop
+    }
+    catch {
+        Write-Warning "BITS transfer failed, falling back to Invoke-WebRequest..."
+        Invoke-WebRequest -Uri $Source -OutFile $Destination -UseBasicParsing -ErrorAction Stop
+    }
+}
+
+# ---------------------------------------------------------------------------
+# Reusable "download a program, run it, (optionally) delete once closed" helper.
+# Every tool is stored under $env:TEMP\obsoftware\<Name> so nothing is left
+# scattered on the C: drive. Replaces the many near-identical download buttons.
+#
+#   -Zip          the download is a .zip that must be extracted first
+#   -RunAs        launch the program elevated
+#   -Wait         wait for the program to close, then delete its files
+#   -ArgumentList arguments passed to the launched program
+#   -ProcessName  process name(s) to watch with -Wait (default: exe base name;
+#                 wildcards allowed, e.g. "Revo*")
+#   -PreLaunch    scriptblock run after download/extract, before launch; it
+#                 receives the target folder as its first argument
+# ---------------------------------------------------------------------------
+Function Invoke-ObSoftware {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$Name,
+        [Parameter(Mandatory)][string]$Url,
+        [Parameter(Mandatory)][string]$Executable,
+        [switch]$Zip,
+        [switch]$RunAs,
+        [switch]$Wait,
+        [string[]]$ArgumentList,
+        [string[]]$ProcessName,
+        [scriptblock]$PreLaunch
+    )
+
+    $targetDir = Join-Path $env:TEMP "obsoftware\$Name"
+
+    # Start from a clean folder so stale files never linger.
+    if (Test-Path -LiteralPath $targetDir) {
+        Remove-Item -LiteralPath $targetDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
+
+    if ($Zip) {
+        $downloadPath = Join-Path $targetDir "$Name.zip"
+    }
+    else {
+        $downloadPath = Join-Path $targetDir (Split-Path -Leaf $Executable)
+    }
+
+    Clear-Host; Write-Host "Downloading $Name..."
+    Invoke-ObDownload -Source $Url -Destination $downloadPath
+
+    if ($Zip) {
+        Clear-Host; Write-Host "Extracting $Name..."
+        Expand-Archive -LiteralPath $downloadPath -DestinationPath $targetDir -Force
+        Remove-Item -LiteralPath $downloadPath -Force -ErrorAction SilentlyContinue
+    }
+
+    if ($PreLaunch) { & $PreLaunch $targetDir }
+
+    $exePath = Join-Path $targetDir $Executable
+    Clear-Host; Write-Host "Running $Name..."
+    $startArgs = @{ FilePath = $exePath }
+    if ($RunAs)        { $startArgs['Verb'] = 'RunAs' }
+    if ($ArgumentList) { $startArgs['ArgumentList'] = $ArgumentList }
+    Start-Process @startArgs
+
+    if ($Wait) {
+        if (-not $ProcessName) {
+            $ProcessName = [System.IO.Path]::GetFileNameWithoutExtension($Executable)
+        }
+        Clear-Host
+        Invoke-PounceCat "$Name should now be running." "This screen will exit when you close it."
+        Start-Sleep -Seconds 2
+        do {
+            $running = Get-Process -Name $ProcessName -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 1
+        } while ($running)
+        Remove-Item -LiteralPath $targetDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
 Function Get-ADDeviceInfo {
     # Get all computers from AD
     $computers = Get-ADComputer -Filter * | Select-Object -ExpandProperty Name
@@ -808,70 +893,33 @@ Enter the number of your choice
 }
 # Download, extract, and run wiztree
 Function Invoke-WizTree {
-    $zipUrl = "https://antibodysoftware-17031.kxcdn.com/files/wiztree_4_31_portable.zip"
-    $targetDir = "$env:TEMP\obsoftware\WizTree"
-    Clear-Host; Write-Host "Downloading WizTree"
-    #Invoke-WebRequest -Uri $zipUrl -OutFile "$env:TEMP\wiztree.zip"
-    Start-BitsTransfer -Source $zipUrl -Destination "$env:TEMP\wiztree.zip"
-    Clear-Host; Write-Host "Extracting WizTree"
-    Expand-Archive -Path "$env:TEMP\wiztree.zip" -DestinationPath $targetDir
-    Clear-Host; Write-Host "Running WizTree."
-    Start-Process -FilePath "$targetDir\WizTree64.exe" -Verb RunAs
+    Invoke-ObSoftware -Name "WizTree" -Url "https://antibodysoftware-17031.kxcdn.com/files/wiztree_4_31_portable.zip" -Executable "WizTree64.exe" -Zip -RunAs
 }
 Function Invoke-HWInfo {
-    $zipUrl = "https://cytranet-dal.dl.sourceforge.net/project/hwinfo/Windows_Portable/hwi_820.zip?viasf=1"
-    $targetDir = "$env:TEMP\obsoftware\HWInfo"
-    
-    Clear-Host; Write-Host "Downloading hwinfo"
-    #Invoke-WebRequest -Uri $zipUrl -OutFile "$env:TEMP\hwinfo.zip"
-    Start-BitsTransfer -Source $zipUrl -Destination "$env:TEMP\hwinfo.zip"
-    Clear-Host; Write-Host "Extracting hwinfo"
-    New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
-    Expand-Archive -Path "$env:TEMP\hwinfo.zip" -DestinationPath $targetDir -Force
-
-    # Create the INI file directly
-    $iniContent = @"
+    Invoke-ObSoftware -Name "HWInfo" -Url "https://cytranet-dal.dl.sourceforge.net/project/hwinfo/Windows_Portable/hwi_820.zip?viasf=1" -Executable "hwinfo64.exe" -Zip -RunAs -PreLaunch {
+        param($dir)
+        @"
 [Settings]
 SummaryOnly=1
 Theme=1
 AutoUpdateBetaDisable=1
 AutoUpdate=0
-"@
-    Set-Content -Path "$targetDir\HWiNFO64.INI" -Value $iniContent -Encoding ASCII
-    Clear-Host; Write-Host "Running hwinfo."
-    Start-Process -FilePath "$targetDir\hwinfo64.exe" -Verb RunAs
+"@ | Set-Content -Path (Join-Path $dir "HWiNFO64.INI") -Encoding ASCII
+    }
 }
 
 # Dot Net Repair Tool
 Function Invoke-DotNetRepair {
-    $installUrl = "https://obtoolbox-public.s3.us-east-2.amazonaws.com/3rd-party-tools/NetFxRepairTool.exe"
-    $targetDir = "$env:TEMP\obsoftware\DotNetRepair"
-    Clear-Host; Write-Host "Installing and Starting .Net Repair Tool"
-    if (-Not (Test-Path -Path $targetDir)) { New-Item -ItemType Directory -Path $targetDir -Force | Out-Null }
-    Invoke-WebRequest -Uri $installUrl -OutFile "$targetDir\NetFxRepairTool.exe"
-    Clear-Host; Write-Host "Running .Net Repair Tool."
-    Start-Process -FilePath "$targetDir\NetFxRepairTool.exe" -Verb RunAs
+    Invoke-ObSoftware -Name "DotNetRepair" -Url "https://obtoolbox-public.s3.us-east-2.amazonaws.com/3rd-party-tools/NetFxRepairTool.exe" -Executable "NetFxRepairTool.exe" -RunAs
 }
 
 Function Install-AEUSBInterface {
-    $installUrl = "https://obtoolbox-public.s3.us-east-2.amazonaws.com/3rd-party-tools/AEUSBInterfaceSetup.exe"
-    $targetDir = "$env:temp\obsoftware\AEUSBInterfaceSetup"
-    Clear-Host; Write-Host "Installing and Starting AE USB Interface Setup"
-    if (-Not (Test-Path -Path $targetDir)) { New-Item -ItemType Directory -Path $targetDir -Force | Out-Null }
-    Start-BitsTransfer -Source $installUrl -Destination "$targetDir\AEUSBInterfaceSetup.exe"
-    Clear-Host; Write-Host "Running AE USB Interface Setup"
-    Start-Process -FilePath "$targetDir\AEUSBInterfaceSetup.exe" -Verb RunAs
+    Invoke-ObSoftware -Name "AEUSBInterfaceSetup" -Url "https://obtoolbox-public.s3.us-east-2.amazonaws.com/3rd-party-tools/AEUSBInterfaceSetup.exe" -Executable "AEUSBInterfaceSetup.exe" -RunAs
 }
 
 
 Function Invoke-TDOXDRW11Fix {
-    $installUrl = "https://obtoolbox-public.s3.us-east-2.amazonaws.com/3rd-party-tools/TDOXDRWin11Fix.exe"
-    $targetDir = "$env:TEMP\obsoftware\TDOXDRWin11Fix"
-    Clear-Host; Write-Host "Running TDOXDR Win11 Fix"
-    if (-Not (Test-Path -Path $targetDir)) { New-Item -ItemType Directory -Path $targetDir -Force | Out-Null }
-    Start-BitsTransfer -Source $installUrl -Destination "$targetDir\TDOXDRWin11Fix.exe"
-    Clear-Host; Write-Host "Downloading the script"
-    Start-Process -FilePath "$targetDir\TDOXDRWin11Fix.exe" -Verb RunAs
+    Invoke-ObSoftware -Name "TDOXDRWin11Fix" -Url "https://obtoolbox-public.s3.us-east-2.amazonaws.com/3rd-party-tools/TDOXDRWin11Fix.exe" -Executable "TDOXDRWin11Fix.exe" -RunAs
 }
 Function Invoke-NetScan {
     Clear-Host
@@ -923,70 +971,24 @@ Function Invoke-NetScan {
     Invoke-PounceCat "Press enter to continue"; Read-Host
 }
 Function Invoke-TeamViewerQS {
-    $installUrl = "https://obtoolbox-public.s3.us-east-2.amazonaws.com/3rd-party-tools/TeamViewerQS_x64.exe"
-    $targetDir = "$env:temp\obsoftware\TeamViewerQS"
-    Clear-Host; Write-Host "Downloading and Starting TeamViewer"
-    if (-Not (Test-Path -Path $targetDir)) { New-Item -ItemType Directory -Path $targetDir -Force | Out-Null}
-    Start-BitsTransfer -Source $installUrl -Destination "$targetDir\TeamviewerQS.exe"
-    Clear-Host; Write-Host "Running TeamViewer"
-    Start-Process -FilePath "$targetDir\TeamViewerQS.exe" -Verb RunAs
+    Invoke-ObSoftware -Name "TeamViewerQS" -Url "https://obtoolbox-public.s3.us-east-2.amazonaws.com/3rd-party-tools/TeamViewerQS_x64.exe" -Executable "TeamViewerQS.exe" -RunAs
 }
 
 Function Invoke-USBTreeView {
-    $installUrl = "https://obtoolbox-public.s3.us-east-2.amazonaws.com/3rd-party-tools/UsbTreeView.exe"
-    $targetDir = "$env:temp\obsoftware\USBTreeView"
-    Clear-Host; Write-Host "Downloading and Starting USB Tree View"
-    if (-Not (Test-Path -Path $targetDir)) { New-Item -ItemType Directory -Path $targetDir -Force | Out-Null}
-    Start-BitsTransfer -Source $installUrl -Destination "$targetDir\UsbTreeView.exe"
-    Clear-Host; Write-Host "Running USB Tree View"
-    Start-Process -FilePath "$targetDir\UsbTreeView.exe" -Verb RunAs
-    Clear-Host; Invoke-PounceCat "USB Tree View should now be running."
-    do {
-        $process = Get-Process | Get-Process | Where-Object { $_.Name -like "UsbTreeView*" }
-        Start-Sleep -Seconds 1
-    } while ($process)
-    Remove-Item -Recurse -Force $targetDir
+    Invoke-ObSoftware -Name "USBTreeView" -Url "https://obtoolbox-public.s3.us-east-2.amazonaws.com/3rd-party-tools/UsbTreeView.exe" -Executable "UsbTreeView.exe" -RunAs -Wait
 }
 
 
 Function Invoke-NewTeamViewerQS {
-    $installUrl = "https://www.teamviewer.com/link/?url=505374"
-    $targetDir = "$env:TEMP\obsoftware\TeamViewerQS"
-    Clear-Host; Write-Host "Downloading and Starting TeamViewer"
-    if (-Not (Test-Path -Path $targetDir)) { New-Item -ItemType Directory -Path $targetDir -Force | Out-Null }
-    Start-BitsTransfer -Source $installUrl -Destination "$targetDir\TeamViewerQS.exe"
-    Clear-Host; Write-Host "Running TeamViewer"
-    Start-Process -FilePath "$targetDir\TeamViewerQS.exe" -Verb RunAs
+    Invoke-ObSoftware -Name "TeamViewerQS" -Url "https://www.teamviewer.com/link/?url=505374" -Executable "TeamViewerQS.exe" -RunAs
 }
 
 Function Invoke-DentrixInstallMigrateTool {
-    $installUrl = "https://dentrix.com/support/core/MigrationAndInstallTool.exe"
-    $targetDir = "$env:TEMP\obsoftware\DentrixInstallMigrateTool"
-    Clear-Host; Write-Host "Downloading and Starting Dentrix Installation and Migration tool"
-    if (-Not (Test-Path -Path $targetDir)) { New-Item -ItemType Directory -Path $targetDir -Force | Out-Null }
-    Start-BitsTransfer -Source $installUrl -Destination "$targetDir\DentrixInstallMigrateTool.exe"
-    Clear-Host; Write-Host "Running the tool"
-    Start-Process -FilePath "$targetDir\DentrixInstallMigrateTool.exe" -Verb RunAs
+    Invoke-ObSoftware -Name "DentrixInstallMigrateTool" -Url "https://dentrix.com/support/core/MigrationAndInstallTool.exe" -Executable "DentrixInstallMigrateTool.exe" -RunAs
 }
 
 Function Invoke-RevoUninstaller {
-    Clear-Host
-    $zipUrl = "https://81081bb5bd2a290e19d0-73f958688cc73e14784b0be099708265.ssl.cf1.rackcdn.com/RevoUninstaller_Portable.zip"
-    $targetDir = "C:\RevoUninstaller"
-    Clear-Host; Write-Host "Downloading RevoUninstaller"
-    Invoke-WebRequest -Uri $zipUrl -OutFile "$env:TEMP\obsoftware\RevoUninstaller.zip"
-    Clear-Host; Write-Host "Extracting RevoUninstaller"
-    New-Item -ItemType Directory $targetDir -Force
-    Expand-Archive -Path "$env:TEMP\obsoftware\RevoUninstaller.zip" -DestinationPath $targetDir -Force
-    Clear-Host; Write-Host "Running RevoUninstaller."
-    Start-Process -FilePath "$targetDir\RevoUninstaller_Portable\RevoUPort.exe" -Verb RunAs
-    Clear-Host; Invoke-PounceCat "RevoUninstaller should now be running." "This screen will exit when you close RevoUninstaller."
-    Start-Sleep -Seconds 3
-    do {
-        $process = Get-Process -Name "Revo*" -ErrorAction SilentlyContinue
-        Start-Sleep -Seconds 1
-    } while ($process)
-    Remove-Item -Recurse -Force $targetDir, "$env:TEMP\obsoftware\RevoUninstaller.zip"
+    Invoke-ObSoftware -Name "RevoUninstaller" -Url "https://81081bb5bd2a290e19d0-73f958688cc73e14784b0be099708265.ssl.cf1.rackcdn.com/RevoUninstaller_Portable.zip" -Executable "RevoUninstaller_Portable\RevoUPort.exe" -Zip -RunAs -Wait -ProcessName "Revo*"
 }
 
 Function Start-HoldMusic {
@@ -1526,6 +1528,60 @@ GO
         Remove-Item -Path $tempSqlFile -ErrorAction SilentlyContinue
     }
 }
+function Invoke-ChimeraNotification {
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$Text,
+        [Switch]$ErrorIcon
+    )
+    
+    [void] [System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms")
+    
+    # Create the notification object
+    $notification = New-Object System.Windows.Forms.NotifyIcon
+    $notification.Visible = $true
+
+    # Determine icon type based on the -ErrorIcon switch
+    if ($ErrorIcon) {
+        $notification.Icon = [System.Drawing.SystemIcons]::Error
+        $notification.BalloonTipIcon = "Error"
+        $notification.BalloonTipTitle = "Chimera Toolbox - Error"
+    } else {
+        $notification.Icon = [System.Drawing.SystemIcons]::Information
+        $notification.BalloonTipIcon = "Info"
+        $notification.BalloonTipTitle = "Chimera Toolbox"
+    }
+
+    $notification.BalloonTipText = $Text
+
+    # Display the notification
+    $notification.ShowBalloonTip(5000)    
+    Start-Sleep -Seconds 5
+    $notification.Visible = $false
+}
+function Reset-PrintToPDF {
+    Write-Host "Checking Microsoft Print to PDF status using DISM..." -ForegroundColor Cyan
+
+    # Query DISM directly and look for the state line
+    $dismCheck = dism.exe /Online /Get-FeatureInfo /FeatureName:Printing-PrintToPDFServices-Features
+    $is_enabled = $dismCheck | Select-String -Pattern "State : Enabled"
+
+    if ($is_enabled) {
+        Write-Host "Microsoft Print to PDF is currently ENABLED. Disabling it now..." -ForegroundColor Yellow
+        dism.exe /Online /Disable-Feature /FeatureName:Printing-PrintToPDFServices-Features /NoRestart
+        
+        Write-Host "Re-enabling Microsoft Print to PDF..." -ForegroundColor Green
+        dism.exe /Online /Enable-Feature /FeatureName:Printing-PrintToPDFServices-Features /NoRestart
+    } 
+    else {
+        Write-Host "Microsoft Print to PDF is currently DISABLED. Enabling it now..." -ForegroundColor Green
+        dism.exe /Online /Enable-Feature /FeatureName:Printing-PrintToPDFServices-Features /NoRestart
+    }
+
+    Write-Host "Process complete!" -ForegroundColor Cyan
+
+    Invoke-ChimeraNotification "Microsoft Print to PDF reinstalled"
+}
 Function Open-SidexisMigrationSection {
     do {
         Clear-Host
@@ -1552,9 +1608,9 @@ Function Open-SidexisMigrationSection {
     
 
         switch ($dentalChoice) {
-            "1" { Start-Process powershell.exe -ArgumentList "-NoProfile -Command & {Import-Module '$env:TEMP\obsoftware\ob.psm1'; Install-SSMS}" -Verb RunAs }
-            "2" { Start-Process powershell.exe -ArgumentList "-NoProfile -Command & {Import-Module '$env:TEMP\obsoftware\ob.psm1'; Install-SIDEXIS_SQL}" -Verb RunAs }
-            "3" { Start-Process powershell.exe -ArgumentList "-NoProfile -Command & {Import-Module '$env:TEMP\obsoftware\ob.psm1'; Restore-DBBackups; Remove-ProvisioningJobTargetType0 -sqlInstance 'localhost\SIDEXIS_SQL' -sqlUser 'sa' -sqlPassword '2BeChanged!'; pause}" -Verb RunAs }
+            "1" { Start-Process powershell.exe -ArgumentList "-NoProfile -Command & {Import-Module '$PSScriptRoot\ob.psm1'; Install-SSMS}" -Verb RunAs }
+            "2" { Start-Process powershell.exe -ArgumentList "-NoProfile -Command & {Import-Module '$PSScriptRoot\ob.psm1'; Install-SIDEXIS_SQL}" -Verb RunAs }
+            "3" { Start-Process powershell.exe -ArgumentList "-NoProfile -Command & {Import-Module '$PSScriptRoot\ob.psm1'; Restore-DBBackups; Remove-ProvisioningJobTargetType0 -sqlInstance 'localhost\SIDEXIS_SQL' -sqlUser 'sa' -sqlPassword '2BeChanged!'; pause}" -Verb RunAs }
             "5" { Set-SidexisServerPath; Read-Host "Press enter to dismiss" }
             "7" { Open-ExternalLink "https://www.dentsplysironasupport.com/content/dam/master/product-procedure-brand-categories/imaging/product-categories/software/imaging-software/sidexis-4/Sidexis%204%20Migration%20Guide%20Rev.2.pdf" }
         }

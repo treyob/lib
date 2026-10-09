@@ -3,7 +3,7 @@ Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Scope Process -Force
 # Setting TLS settings for script execution
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-$tuiUrl   = "https://github.com/treyob/lib/releases/download/v1.01/chimera-toolbox.zip"
+$tuiUrl   = "https://github.com/treyob/lib/releases/download/v1.02/chimera-toolbox.zip"
 $tempPath = "$env:TEMP\chimera-toolbox"
 $zipPath  = Join-Path $tempPath "chimera-toolbox.zip"
 $exePath = Join-Path $tempPath "chimera-toolbox.exe"
