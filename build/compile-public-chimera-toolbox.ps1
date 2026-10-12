@@ -1,4 +1,16 @@
-# Compile
+# Compile (PUBLIC build - no login, no authentication)
+#
+# This produces the build that is safe to publish to the public GitHub
+# "lib" releases folder that chimera-toolbox.ps1 downloads from (anyone who
+# runs the public "irm | iex" one-liner gets this exact .zip). It compiles
+# obtoolbox_tui.py directly - skipping textual_login.py and its Login
+# screen entirely - and does NOT bundle passwords.xml, since there is no
+# login step here to check credentials against and shipping password
+# hashes in a public download serves no purpose.
+#
+# For the password-gated build (which must stay OUT of the public lib
+# repo), use "compile-private-chimera-toolbox.ps1" instead.
+
 # Resolve the repo root relative to this script's own location instead of a
 # path hardcoded to one machine/user, so this works wherever the repo is
 # checked out (this script lives in <repo>\build, so the repo root is one
@@ -13,7 +25,6 @@ nuitka `
   --noinclude-default-mode=error `
   --output-filename="chimera-toolbox.exe" `
   --include-data-file=.\src\app\obtoolbox.tcss=obtoolbox.tcss `
-  --include-data-file=.\src\backend\data\passwords.xml=passwords.xml `
   --windows-icon-from-ico=.\src\app\overbytes.ico `
   --include-package=rich._unicode_data.unicode17-0-0 `
   --noinclude-pytest-mode=nofollow `
@@ -22,7 +33,7 @@ nuitka `
   --lto=yes `
   --clang `
   <#--remove-output #>`
-  ".\src\app\textual_login.py"
+  ".\src\app\obtoolbox_tui.py"
 
 # Locate upx.exe instead of assuming a hardcoded machine-specific path:
 # prefer it on PATH, fall back to the conventional C:\upx install, and skip
@@ -38,27 +49,29 @@ if ($upxCmd) {
 }
 
 if ($upxPath) {
-    & $upxPath --best --lzma "textual_login.dist\chimera-toolbox.exe"
+    & $upxPath --best --lzma "obtoolbox_tui.dist\chimera-toolbox.exe"
 } else {
     Write-Warning "upx.exe not found (checked PATH and C:\upx\upx.exe) - skipping exe compression."
 }
 
 # Make a directory called backend in the same directory as the compiled exe, and copy the ob.psm1, dentalsoftware.psm1, and fun.psm1 modules into it
-$exe_dir = ".\textual_login.dist"
+$exe_dir = ".\obtoolbox_tui.dist"
 $backend_dir = Join-Path $exe_dir "backend"
 New-Item -ItemType Directory -Force -Path $backend_dir
 Copy-Item -Path ".\src\backend\modules\ob.psm1" -Destination $backend_dir -Force
 Copy-Item -Path ".\src\backend\modules\dentalsoftware.psm1" -Destination $backend_dir -Force
 Copy-Item -Path ".\src\backend\modules\fun.psm1" -Destination $backend_dir -Force
 
-# Take all files and directories in the dist folder and zip them into a file called chimera-toolbox.zip in the working directory
+# Take all files and directories in the dist folder and zip them into a file called chimera-toolbox.zip in the working directory.
+# This filename matches exactly what chimera-toolbox.ps1 downloads from the
+# public GitHub release, so this .zip is the one meant to be uploaded there.
 Compress-Archive -Path (Join-Path $exe_dir "*") -DestinationPath .\chimera-toolbox.zip -Force
 
 # Clean up build artifacts now that everything is packaged into chimera-toolbox.zip.
-# textual_login.build is Nuitka's intermediate C build (never needed after compiling),
-# and textual_login.dist is fully captured inside chimera-toolbox.zip, so both are safe to remove.
+# obtoolbox_tui.build is Nuitka's intermediate C build (never needed after compiling),
+# and obtoolbox_tui.dist is fully captured inside chimera-toolbox.zip, so both are safe to remove.
 Write-Host "Cleaning up build artifacts..."
-$build_dir = ".\textual_login.build"
+$build_dir = ".\obtoolbox_tui.build"
 Remove-Item -Recurse -Force -Path $build_dir -ErrorAction SilentlyContinue
 Remove-Item -Recurse -Force -Path $exe_dir -ErrorAction SilentlyContinue
-Write-Host "Done. Output: chimera-toolbox.zip"
+Write-Host "Done. Output: chimera-toolbox.zip (no login, no passwords.xml - safe for the public lib repo)"
