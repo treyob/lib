@@ -35,23 +35,24 @@ nuitka `
   <#--remove-output #>`
   ".\src\app\obtoolbox_tui.py"
 
-# Locate upx.exe instead of assuming a hardcoded machine-specific path:
-# prefer it on PATH, fall back to the conventional C:\upx install, and skip
-# compression (with a warning) rather than failing the whole build if
-# neither is found.
+# Locate upx.exe: prefer it on PATH, then fall back to a copy under this
+# repo's own build\ folder (e.g. build\upx-5.2.1-win64\upx.exe) instead of
+# a machine-specific C:\upx install - any upx.exe found anywhere under
+# build\ is used, so dropping in a newer UPX release there keeps working
+# without editing this script. Skip compression (with a warning) rather
+# than failing the whole build if neither is found.
 $upxCmd = Get-Command upx.exe -ErrorAction SilentlyContinue
 if ($upxCmd) {
     $upxPath = $upxCmd.Source
-} elseif (Test-Path "C:\upx\upx.exe") {
-    $upxPath = "C:\upx\upx.exe"
 } else {
-    $upxPath = $null
+    $upxPath = Get-ChildItem -Path "$repoRoot\build" -Filter "upx.exe" -Recurse -ErrorAction SilentlyContinue |
+        Select-Object -First 1 -ExpandProperty FullName
 }
 
 if ($upxPath) {
     & $upxPath --best --lzma "obtoolbox_tui.dist\chimera-toolbox.exe"
 } else {
-    Write-Warning "upx.exe not found (checked PATH and C:\upx\upx.exe) - skipping exe compression."
+    Write-Warning "upx.exe not found (checked PATH and $repoRoot\build) - skipping exe compression."
 }
 
 # Make a directory called backend in the same directory as the compiled exe, and copy the ob.psm1, dentalsoftware.psm1, and fun.psm1 modules into it
