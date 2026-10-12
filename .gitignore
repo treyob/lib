@@ -6,3 +6,6 @@ __pycache__/
 *.build/
 *.zip
 build/upx*/
+
+# Private data (passwords.xml) - never publish
+src/backend/data/
