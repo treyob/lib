@@ -6,6 +6,7 @@ from textual.app import App
 from textual.containers import Container, VerticalScroll
 from textual.widgets import Button, Footer, Header, Static
 from ascii import ChonkCatAscii, ElGatoAscii, NerdCatAscii, TitleAscii
+from hold_music import HoldMusicScreen, stop_music
 from pathlib import Path
 import atexit
 import tempfile
@@ -93,6 +94,44 @@ Exit
         yield Button(self.button_name)
 
 
+def get_serial_number() -> str:
+    """Reads the BIOS serial number once, when the app starts."""
+    try:
+        result = subprocess.run(
+            ["powershell", "-NoProfile", "-Command",
+             "(Get-CimInstance -ClassName Win32_BIOS).SerialNumber"],
+            capture_output=True, text=True, timeout=20, check=False,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+        return result.stdout.strip() or "Unknown"
+    except Exception:
+        return "Unknown"
+
+
+class SerialButton(Static):
+    """Button that shows the device serial number and copies it when pressed"""
+
+    def __init__(self, serial: str, **kwargs):
+        super().__init__(**kwargs)
+        self.serial = serial
+
+    @on(Button.Pressed)
+    def copy_serial(self) -> None:
+        """Copies the serial number to the clipboard"""
+        try:
+            # clip.exe works in every Windows console (conhost included)
+            subprocess.run(["clip"], input=self.serial, text=True, check=False,
+                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        except Exception:
+            pass
+        # OSC 52 fallback for Windows Terminal / remote sessions
+        self.app.copy_to_clipboard(self.serial)
+        self.app.sub_title = f"Copied serial: {self.serial}"
+
+    def compose(self):
+        yield Button(f"Serial: {self.serial}")
+
+
 class ESIOSSButton(Static):
     """Button for going to the ES IOSS Configuration Section"""
     @on(Button.Pressed)
@@ -103,6 +142,17 @@ class ESIOSSButton(Static):
 
     def compose(self):
         yield Button("ES IOSS Configuration")
+
+
+class HoldMusicButton(Static):
+    """Button for opening the Hold Music section (hold_music.py)"""
+    @on(Button.Pressed)
+    def hold_music_section(self) -> None:
+        """Pushes the Hold Music screen on top of the main app"""
+        self.app.push_screen(HoldMusicScreen())
+
+    def compose(self):
+        yield Button("Hold Music")
 
 
 class ChimeraToolbox(App):
@@ -123,6 +173,7 @@ class ChimeraToolbox(App):
         self.current_command = None
         self.current_ps_command = None
         self.sub_title = ""
+        self.serial_number = get_serial_number()
 
     def compose(self):
         yield Header()
@@ -136,8 +187,7 @@ class ChimeraToolbox(App):
                                    powershell_command="Invoke-WindowsRepair")
                 yield ScriptButton(button_name="Reset Print Spooler",
                                    powershell_command="Invoke-ResetSpooler")
-                yield ScriptButton(button_name="Get Serial Number",
-                                   powershell_command="Get-DeviceInfo")
+                yield SerialButton(serial=self.serial_number)
                 yield ScriptButton(button_name="Run GPUpdate",
                                    powershell_command="Update-GroupPolicy")
                 yield ScriptButton(button_name="Flush and Register DNS",
@@ -187,8 +237,7 @@ class ChimeraToolbox(App):
                                    hidden=True)
                 yield ScriptButton(button_name="Office Install",
                                    powershell_command="Invoke-OfficeInstall")
-                yield ScriptButton(button_name="Hold Music",
-                                   powershell_command="Invoke-HoldMusicSection")
+                yield HoldMusicButton()
                 yield ScriptButton(button_name="Battleship",
                                    powershell_command="Invoke-Battleship",
                                    hidden=False)
@@ -286,10 +335,15 @@ class ChimeraToolbox(App):
 
     def action_exit_obtoolbox(self) -> None:
         """Exits the application cleanly"""
+        stop_music()
         self.exit()
 
     def switch_section(self, section_id: str, subtitle: str) -> None:
         """Hides all button sets but the specified section_id"""
+        # If a pushed screen (e.g. Hold Music) is open, return to the main
+        # screen first so the section keys work from anywhere.
+        while len(self.screen_stack) > 1:
+            self.pop_screen()
         for button_set in ["#dental-buttons", "#main-buttons", "#es-ioss-buttons"]:
             grid = self.query_one(button_set)
             if button_set == section_id:
@@ -301,6 +355,7 @@ class ChimeraToolbox(App):
 
 def deleteOBSoftwareTempFiles():
     """Deletes temp obsoftware and all its contents recursively."""
+    stop_music()  # release the hold music .wav so it can be deleted
     obsoftware_temp_dir = Path(tempfile.gettempdir()) / "obsoftware"
 
     if obsoftware_temp_dir.exists():

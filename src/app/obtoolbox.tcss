@@ -1,5 +1,5 @@
 ChimeraToolbox {
-    ScriptButton {
+    ScriptButton, HoldMusicButton, SongButton {
         width: 100%;
     }
     Button {
@@ -49,4 +49,10 @@ Title {
     Static {
         content-align: center middle;
     }
+}
+
+/* Hold Music section (hold_music.py) */
+#now-playing {
+    margin: 1 0 0 0;
+    color: $accent;
 }
